@@ -25,10 +25,13 @@ def UrlInit(RootUrl):
         password.send_keys("password")
         button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "Submit")))
         button.click()
-        while(FullHTML == driver.page_source):
-            time.sleep(1)
-            FullHTML = driver.page_source
+        time.sleep(3)
+        # while(FullHTML == driver.page_source):
+        #     time.sleep(1)
+        #     FullHTML = driver.page_source
         print(f"{Fore.GREEN}Login Success{Style.RESET_ALL}")
+        print(f"{Fore.RED}Waiting for 2 seconds for website fully render.{Style.RESET_ALL}")
+        time.sleep(2)
         return driver
     except Exception as e:
         print(f"Error: {e}")
@@ -37,8 +40,8 @@ def AllTags(driver):
     try:
         FullHTML = driver.page_source
         soup = BeautifulSoup(FullHTML, "html.parser")
-        all_tags = soup.find_all()
-        return all_tags
+        AllTags = soup.find_all()
+        return AllTags
     except Exception as e:
         print(f"Error: {e}")
     
@@ -82,8 +85,22 @@ def main(RootUrl):
     UrlQueue = GetStaticUrl(all_tags, RootUrl)
     for url in UrlQueue:
         print(url)
+    TestDriver(driver, RootUrl)
+
+
+def TestDriver(driver, RootUrl): 
+    driver.get("http://192.168.11.129:8080/index.php/your-profile")
+    time.sleep(2)
+    FullHTML = driver.page_source
+    soup = BeautifulSoup(FullHTML, "html.parser")
+    AllTags = soup.find_all()
+    # form = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "member-profile")))
+    # filedset = form.find_elements(By.TAG_NAME, "fieldset")
+    # for fieldset in filedset:
+    #     print(fieldset.text)
 
 if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"
     init(autoreset=True)
     main(RootUrl)
+    
