@@ -2,10 +2,12 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-
+from colorama import Fore, Back, Style, init
 
 def UrlInit(RootUrl):
     try:
@@ -15,14 +17,18 @@ def UrlInit(RootUrl):
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(RootUrl)
+        FullHTML = driver.page_source
         time.sleep(2)
-        username = driver.find_element(By.ID, "modlgn-username")
-        password = driver.find_element(By.ID, "modlgn-passwd")
+        username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-username")))
+        password = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-passwd")))
         username.send_keys("user")
         password.send_keys("password")
-        button = driver.find_element(By.NAME, "Submit")
+        button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "Submit")))
         button.click()
-        time.sleep(2)
+        while(FullHTML == driver.page_source):
+            time.sleep(1)
+            FullHTML = driver.page_source
+        print(f"{Fore.GREEN}Login Success{Style.RESET_ALL}")
         return driver
     except Exception as e:
         print(f"Error: {e}")
@@ -79,4 +85,5 @@ def main(RootUrl):
 
 if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"
+    init(autoreset=True)
     main(RootUrl)
