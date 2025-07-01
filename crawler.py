@@ -79,4 +79,4 @@ def main(RootUrl):
 
 if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"
-    main()
+    main(RootUrl)
