@@ -8,20 +8,77 @@ import time
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from colorama import Fore, Back, Style, init
+import subprocess
+import requests
 
 UrlQueue = []
 VisitedUrl = []
+ProxyHost = "http://127.0.0.1"
+ProxyPort = 8080
+
+# ---- Mitmproxy ----
+# MitmProxyHost = "127.0.0.1"
+# MitmProxyPort = 8080
+# MitmAddon = "proxy/api_collector_addon.py"
+# MitmWebApiPort = 8081
+# MitmWebApiUrl = f"http://{MitmProxyHost}:{MitmWebApiPort}/api/requests"
+
+def GetXpath(input_tag): # 將參數名改為 input_tag 更清晰
+    path = []
+    el = input_tag # 在這裡複製一份，用 el 來遍歷，不改變原始 input_tag
+
+    for parent in el.parents: # 遍歷 el 的所有祖先
+        if parent is None or parent.name is None: # 判斷是否到達文檔根部或無效父節點
+            break
+        
+        # 獲取當前元素 el 在其父元素 parent 下的所有同名兄弟元素
+        siblings_of_same_name = [s for s in parent.children if s.name == el.name]
+        
+        # 如果有多個同名兄弟元素，需要添加索引來區分
+        if len(siblings_of_same_name) > 1:
+            count = 1
+            # 遍歷父元素的所有子元素，找到當前元素 el 是同名兄弟中的第幾個
+            for sibling in parent.children:
+                if sibling == el: # 找到當前元素
+                    path.append(f"{el.name}[{count}]")
+                    break # 找到後跳出內層循環
+                if sibling.name == el.name: # 如果是同名兄弟，計數器加一
+                    count += 1
+        else:
+            # 如果只有一個同名兄弟，則不需要索引
+            path.append(el.name)
+        
+        el = parent # 移動到父元素，繼續向上遍歷
+            
+    # 將路徑反轉（因為我們是從下往上構建的），然後用 '/' 連接，並在最前面加上 '/'
+    return '/' + '/'.join(reversed(path))
+
+def GetPotentialInteractive(AllTags):
+    print(f"{Fore.GREEN}Getting Potential Interactive...{Style.RESET_ALL}")
+    KeyWords = ["submit", "save", "update", "edit", "delete", "add", "new", "create", 
+        "confirm", "ok", "next", "send", "post", "search", "filter", "login",
+        "btn", "button", "action", "link", "panel", "modal", "dialog", "item"]
+    
+    # print(AllTags)
+
+    for tag in AllTags:
+        if tag.get("onclick",""):
+            if tag.get("href") == "#":
+                continue
+            print(GetXpath(tag))
+    
 
 def UrlInit(RootUrl):
     try:
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        # chrome_options.add_argument(f"--proxy-server={ProxyHost}:{ProxyPort}")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(RootUrl)
         VisitedUrl.append(GetUrlPath(RootUrl, GetDomainName(RootUrl)))
-        FullHTML = driver.page_source
+        # FullHTML = driver.page_source
         time.sleep(2)
         username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-username")))
         password = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-passwd")))
@@ -130,30 +187,31 @@ def GetNext(driver, url):
     driver.get(url)
     time.sleep(3)
     AllTags = GetAllTags(driver)
+    GetPotentialInteractive(AllTags)
     GetStaticUrl(AllTags, url)
 
 def main(RootUrl):
-    driver = UrlInit(RootUrl)
-    AllTags = GetAllTags(driver)
-    UrlQueue = GetStaticUrl(AllTags, RootUrl)
-    # GetNext(driver, UrlQueue[3])
-    for i in range(len(UrlQueue)):
-        GetNext(driver, UrlQueue[i])
-    print(f"{Fore.GREEN}Done{Style.RESET_ALL}")
-    for i in range(len(VisitedUrl)):
-        print(VisitedUrl[i])
+    # MitmProcess = None
+    driver = None
+    try:
+        # MitmProcess = StartMitmProxy(MitmAddon)
+        driver = UrlInit(RootUrl)
+        AllTags = GetAllTags(driver)
+        UrlQueue = GetStaticUrl(AllTags, RootUrl)
+        for i in range(len(UrlQueue)):
+            GetNext(driver, UrlQueue[i])
+        print(f"{Fore.GREEN}Done{Style.RESET_ALL}")
+        for i in range(len(VisitedUrl)):
+            print(VisitedUrl[i])
+    except Exception as e:
+        print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+    finally:
+        if driver:
+            driver.close()
+            print(f"{Fore.GREEN}Driver closed.{Style.RESET_ALL}")
+        # if MitmProcess:
+        #     StopMitmProxy(MitmProcess)
     
-
-# def TestDriver(driver, RootUrl): 
-#     driver.get("http://192.168.11.129:8080/index.php/your-profile")
-#     time.sleep(2)
-#     FullHTML = driver.page_source
-#     soup = BeautifulSoup(FullHTML, "html.parser")
-#     AllTags = soup.find_all()
-#     form = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "member-profile")))
-#     filedset = form.find_elements(By.TAG_NAME, "fieldset")
-#     for fieldset in filedset:
-#         print(fieldset.text)
 
 if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"
