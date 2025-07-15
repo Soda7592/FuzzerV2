@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import time
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
@@ -23,49 +24,61 @@ ProxyPort = 8080
 # MitmWebApiPort = 8081
 # MitmWebApiUrl = f"http://{MitmProxyHost}:{MitmWebApiPort}/api/requests"
 
-def GetXpath(input_tag): # 將參數名改為 input_tag 更清晰
+def GetXpath(input_tag):
     path = []
-    el = input_tag # 在這裡複製一份，用 el 來遍歷，不改變原始 input_tag
+    el = input_tag
 
-    for parent in el.parents: # 遍歷 el 的所有祖先
-        if parent is None or parent.name is None: # 判斷是否到達文檔根部或無效父節點
+    for parent in el.parents:
+        if parent is None or parent.name is None:
             break
         
-        # 獲取當前元素 el 在其父元素 parent 下的所有同名兄弟元素
         siblings_of_same_name = [s for s in parent.children if s.name == el.name]
-        
-        # 如果有多個同名兄弟元素，需要添加索引來區分
+
         if len(siblings_of_same_name) > 1:
             count = 1
-            # 遍歷父元素的所有子元素，找到當前元素 el 是同名兄弟中的第幾個
             for sibling in parent.children:
-                if sibling == el: # 找到當前元素
+                if sibling == el:
                     path.append(f"{el.name}[{count}]")
-                    break # 找到後跳出內層循環
-                if sibling.name == el.name: # 如果是同名兄弟，計數器加一
+                    break 
+                if sibling.name == el.name:
                     count += 1
         else:
-            # 如果只有一個同名兄弟，則不需要索引
             path.append(el.name)
         
-        el = parent # 移動到父元素，繼續向上遍歷
+        el = parent
             
-    # 將路徑反轉（因為我們是從下往上構建的），然後用 '/' 連接，並在最前面加上 '/'
     return '/' + '/'.join(reversed(path))
 
-def GetPotentialInteractive(AllTags):
+def ClickByXpath(driver, xpath, timeout=10):
+    print(f"{Fore.BLUE}Clicking by Xpath: {Fore.RED} {xpath} {Style.RESET_ALL}")
+    try:
+        target = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.XPATH, xpath)))
+        target.click()
+        print(f"{Fore.GREEN}Clicked by Xpath: {Fore.RED} {xpath} {Style.RESET_ALL}")
+        return True
+    except TimeoutException:
+        print(f"{Fore.RED}Timeout: {xpath} {Style.RESET_ALL}")
+        return False
+    except NoSuchElementException:
+        print(f"{Fore.RED}No such element: {xpath} {Style.RESET_ALL}")
+        return False
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+def GetPotentialInteractive(driver, AllTags):
     print(f"{Fore.GREEN}Getting Potential Interactive...{Style.RESET_ALL}")
     KeyWords = ["submit", "save", "update", "edit", "delete", "add", "new", "create", 
         "confirm", "ok", "next", "send", "post", "search", "filter", "login",
         "btn", "button", "action", "link", "panel", "modal", "dialog", "item"]
     
     # print(AllTags)
-
     for tag in AllTags:
         if tag.get("onclick",""):
             if tag.get("href") == "#":
                 continue
-            print(GetXpath(tag))
+            xpath = GetXpath(tag)
+            ClickByXpath(driver, xpath)
     
 
 def UrlInit(RootUrl):
@@ -73,7 +86,7 @@ def UrlInit(RootUrl):
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        # chrome_options.add_argument(f"--proxy-server={ProxyHost}:{ProxyPort}")
+        chrome_options.add_argument(f"--proxy-server={ProxyHost}:{ProxyPort}")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(RootUrl)
@@ -187,7 +200,7 @@ def GetNext(driver, url):
     driver.get(url)
     time.sleep(3)
     AllTags = GetAllTags(driver)
-    GetPotentialInteractive(AllTags)
+    GetPotentialInteractive(driver, AllTags)
     GetStaticUrl(AllTags, url)
 
 def main(RootUrl):
