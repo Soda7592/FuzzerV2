@@ -14,6 +14,8 @@ import requests
 
 UrlQueue = []
 VisitedUrl = []
+PathsApi = {}
+PathsPath = {}
 ProxyHost = "http://127.0.0.1"
 ProxyPort = 8080
 
@@ -27,13 +29,10 @@ ProxyPort = 8080
 def GetXpath(input_tag):
     path = []
     el = input_tag
-
     for parent in el.parents:
         if parent is None or parent.name is None:
             break
-        
         siblings_of_same_name = [s for s in parent.children if s.name == el.name]
-
         if len(siblings_of_same_name) > 1:
             count = 1
             for sibling in parent.children:
@@ -44,12 +43,10 @@ def GetXpath(input_tag):
                     count += 1
         else:
             path.append(el.name)
-        
         el = parent
-            
     return '/' + '/'.join(reversed(path))
 
-def ClickByXpath(driver, xpath, timeout=10):
+def ClickByXpath(driver, xpath, timeout=5):
     print(f"{Fore.BLUE}Clicking by Xpath: {Fore.RED} {xpath} {Style.RESET_ALL}")
     try:
         target = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.XPATH, xpath)))
@@ -57,28 +54,35 @@ def ClickByXpath(driver, xpath, timeout=10):
         print(f"{Fore.GREEN}Clicked by Xpath: {Fore.RED} {xpath} {Style.RESET_ALL}")
         return True
     except TimeoutException:
-        print(f"{Fore.RED}Timeout: {xpath} {Style.RESET_ALL}")
+        print(f"{Fore.RED}[!] Timeout: {xpath} {Style.RESET_ALL}")
         return False
     except NoSuchElementException:
-        print(f"{Fore.RED}No such element: {xpath} {Style.RESET_ALL}")
+        print(f"{Fore.RED}[!] No such element: {xpath} {Style.RESET_ALL}")
         return False
     except Exception as e:
         print(f"Error: {e}")
         return False
 
-def GetPotentialInteractive(driver, AllTags):
+def GetPotentialInteractive(driver, RootUrl, AllTags):
     print(f"{Fore.GREEN}Getting Potential Interactive...{Style.RESET_ALL}")
-    KeyWords = ["submit", "save", "update", "edit", "delete", "add", "new", "create", 
-        "confirm", "ok", "next", "send", "post", "search", "filter", "login",
-        "btn", "button", "action", "link", "panel", "modal", "dialog", "item"]
-    
+    # KeyWords = ["submit", "save", "update", "edit", "delete", "add", "new", "create", 
+    #     "confirm", "ok", "next", "send", "post", "search", "filter", "login",
+    #     "btn", "button", "action", "link", "panel", "modal", "dialog", "item"]
+    RootDomain = GetDomainName(RootUrl)
     # print(AllTags)
     for tag in AllTags:
         if tag.get("onclick",""):
+            path = driver.current_url
+            PathsApi[path] = None
             if tag.get("href") == "#":
                 continue
             xpath = GetXpath(tag)
             ClickByXpath(driver, xpath)
+            PathsApi[path] = {driver.current_url:""}
+            if driver.current_url != path and GetUrlPath(driver.current_url, RootDomain) not in VisitedUrl:
+                UrlQueue.append(driver.current_url)
+                VisitedUrl.append(GetUrlPath(driver.current_url, RootDomain))
+                print(f"{Fore.RED}BTN Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {GetUrlPath(driver.current_url, RootDomain)} {Style.RESET_ALL}")
     
 
 def UrlInit(RootUrl):
@@ -86,7 +90,7 @@ def UrlInit(RootUrl):
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument(f"--proxy-server={ProxyHost}:{ProxyPort}")
+        # chrome_options.add_argument(f"--proxy-server={ProxyHost}:{ProxyPort}")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(RootUrl)
@@ -155,14 +159,18 @@ def GetMergeUrl(RootUrl, RootDomain, path):
         else:
             return "http://" + RootDomain + path
 
-def GetStaticUrl(AllTags, RootUrl):
+def GetStaticUrl(driver, AllTags, RootUrl):
     RootDomain = GetDomainName(RootUrl)
+    path = driver.current_url
+    if path not in PathsPath:
+        PathsPath[path] = []
     for tag in AllTags:
         if tag.name == "a": # and tag.get("href") not in VisitedUrl and tag.get("href") != None:
             t = GetUrlPath(tag.get("href"), RootDomain)
             if t not in VisitedUrl and t != None: 
                 if ("http" in t or "https" in t) and t != None and t != "" and t[0] != "#":
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
+                    PathsPath[path].append(t)
                     print(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {t} {Style.RESET_ALL}")
                     VisitedUrl.append(t)
                     # print(GetMergeUrl(RootUrl, RootDomain, t))
@@ -170,6 +178,7 @@ def GetStaticUrl(AllTags, RootUrl):
                     # if(t[0] == "#") :
                     #     continue 
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
+                    PathsPath[path].append(t)
                     print(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {t} {Style.RESET_ALL}")
                     VisitedUrl.append(t)
                 # print(GetMergeUrl(RootUrl, RootDomain, t))
@@ -178,6 +187,7 @@ def GetStaticUrl(AllTags, RootUrl):
             if t not in VisitedUrl and t != None:
                 if ("http" in t or "https" in t) and t != None and t != "" and t[0] != "#":
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
+                    PathsPath[path].append(t)
                     print(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {t} {Style.RESET_ALL}")
                     VisitedUrl.append(t)
                     # print(GetMergeUrl(RootUrl, RootDomain, t))
@@ -185,23 +195,25 @@ def GetStaticUrl(AllTags, RootUrl):
                     # if(t[0] == "#") :
                     #     continue
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
+                    PathsPath[path].append(t)
                     print(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {t} {Style.RESET_ALL}")
                     VisitedUrl.append(t)
                     # print(GetMergeUrl(RootUrl, RootDomain, t))
-    PrintUrlQueue(UrlQueue)
+    # PrintUrlQueue(UrlQueue)
     return UrlQueue
 
 def PrintUrlQueue(UrlQueue):
     for url in UrlQueue:
         print(url)
 
-def GetNext(driver, url):
+def GetNext(driver, RootUrl, url):
     print(f"{Fore.GREEN}\nGetting Next Url: {Fore.RED} {url} {Style.RESET_ALL}") 
     driver.get(url)
     time.sleep(3)
     AllTags = GetAllTags(driver)
-    GetPotentialInteractive(driver, AllTags)
-    GetStaticUrl(AllTags, url)
+    GetStaticUrl(driver, AllTags, url)
+    GetPotentialInteractive(driver, RootUrl, AllTags)
+    
 
 def main(RootUrl):
     # MitmProcess = None
@@ -209,10 +221,14 @@ def main(RootUrl):
     try:
         # MitmProcess = StartMitmProxy(MitmAddon)
         driver = UrlInit(RootUrl)
-        AllTags = GetAllTags(driver)
-        UrlQueue = GetStaticUrl(AllTags, RootUrl)
-        for i in range(len(UrlQueue)):
-            GetNext(driver, UrlQueue[i])
+        # AllTags = GetAllTags(driver)
+        GetNext(driver, RootUrl, RootUrl)
+        # VisitedUrl.append(RootUrl)
+        i = 0
+        while len(UrlQueue)-1 > i :
+            GetNext(driver, RootUrl, UrlQueue[i])
+            i+=1
+            print(f"{Fore.GREEN}Get Next Url: {Fore.RED} {UrlQueue[i]} {Style.RESET_ALL}")
         print(f"{Fore.GREEN}Done{Style.RESET_ALL}")
         for i in range(len(VisitedUrl)):
             print(VisitedUrl[i])
@@ -224,6 +240,14 @@ def main(RootUrl):
             print(f"{Fore.GREEN}Driver closed.{Style.RESET_ALL}")
         # if MitmProcess:
         #     StopMitmProxy(MitmProcess)
+    print("\n\nPathsAPIs:")
+    for path in PathsApi:
+        print(f"{Fore.BLUE}[*]{path}{Style.RESET_ALL}")
+        print(f"{Fore.RED}{PathsApi[path]}{Style.RESET_ALL}")
+    print("\n\nPathspath:")
+    for path in PathsPath:
+        print(f"{Fore.BLUE}[*]{path}{Style.RESET_ALL}")
+        print(f"{Fore.RED}{PathsPath[path]}{Style.RESET_ALL}")
     
 
 if __name__ == "__main__":
