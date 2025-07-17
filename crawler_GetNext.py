@@ -176,6 +176,13 @@ def GetMergeUrl(RootUrl, RootDomain, path):
             return "http://" + RootDomain + path
 
 # 應該要用 urljoin()，不然自己寫頭會破
+# 問題在 HTML 瀏覽器的絕對路徑和相對路徑
+# 有的時候 href 會寫成 href = "/administrator/index.php" 這種是絕對路徑
+# 有的時候 href 會寫成 href = "index.php" 這種是相對路徑，這表示說把這個 url 加到 current url 的後面
+# 例如 current_url 為 http://mtsec.dev/adminiatrator/ 那相對路徑就會變成 http://mtsec.dev/adminiatrator/index.php
+
+# 我的 case 在處理相對路徑時會出錯，看看有沒有辦法用 urljoin() 來處理
+
 
 def GetStaticUrl(driver, AllTags, RootUrl):
     RootDomain = GetDomainName(RootUrl)
