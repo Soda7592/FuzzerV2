@@ -14,7 +14,6 @@ async def WebHandleRequest(request):
     while CollectedApiRequests:
         data.append(CollectedApiRequests.popleft())
     print(f"{Fore.GREEN}[*] Addon Web API: Sending {len(data)} captured requests to client.{Style.RESET_ALL}")
-
     return web.json_response(data)
 
 async def RunWebApi():
@@ -66,15 +65,15 @@ class APICollector:
         or "optimizationguide-pa.googleapis.com" in flow.request.host :
             return
         if self.TargetDomain != flow.request.host:
-            print(f"{Fore.WHITE}[*] Addon Web API: Skipping request to {flow.request.host}{Style.RESET_ALL}")
+            # print(f"{Fore.WHITE}[*] Addon Web API: Skipping request to {flow.request.host}{Style.RESET_ALL}")
             return 
         
         UrlPath = flow.request.path.lower()
         if any(UrlPath.startswith(prefix) for prefix in self.StaticPathPrefixes):
-            print(f"{Fore.WHITE}[*] Addon Web API: Skipping static file request: {flow.request.pretty_url}{Style.RESET_ALL}")
+            # print(f"{Fore.WHITE}[*] Addon Web API: Skipping static file request: {flow.request.pretty_url}{Style.RESET_ALL}")
             return
         if any(UrlPath.endswith(ext) for ext in self.StaticExtensions):
-            print(f"{Fore.WHITE}[*] Addon Web API: Skipping static file request: {flow.request.pretty_url}{Style.RESET_ALL}")
+            # print(f"{Fore.WHITE}[*] Addon Web API: Skipping static file request: {flow.request.pretty_url}{Style.RESET_ALL}")
             return
 
         try:

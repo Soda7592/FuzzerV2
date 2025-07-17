@@ -26,6 +26,20 @@ ProxyPort = 8080
 # MitmWebApiPort = 8081
 # MitmWebApiUrl = f"http://{MitmProxyHost}:{MitmWebApiPort}/api/requests"
 
+def GetLoginSession(driver, LoginUrl):
+    driver.get(LoginUrl)
+    time.sleep(2)
+    username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "mod-login-username")))
+    password = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "mod-login-password")))
+    username.send_keys("user")
+    password.send_keys("password")
+    button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "button.btn.btn-primary.btn-block.btn-large.login-button")))
+    button.click()
+    time.sleep(3)
+    print(f"{Fore.GREEN}Login Success{Style.RESET_ALL}")
+    print(f"{Fore.RED}Waiting for 2 seconds for website fully render.{Style.RESET_ALL}")
+    time.sleep(2)
+
 def GetXpath(input_tag):
     path = []
     el = input_tag
@@ -151,6 +165,8 @@ def GetUrlPath(url, RootDomain) :
         return url
 
 def GetMergeUrl(RootUrl, RootDomain, path):
+    if path[0] != "/":
+        path = "/" + path
     if "http" in path:
         path = GetUrlPath(path, RootDomain)
     if "http" in RootUrl:
@@ -167,6 +183,9 @@ def GetStaticUrl(driver, AllTags, RootUrl):
     for tag in AllTags:
         if tag.name == "a": # and tag.get("href") not in VisitedUrl and tag.get("href") != None:
             t = GetUrlPath(tag.get("href"), RootDomain)
+            print(t)
+            if t != None and t[0] != "/" and t[0] != "#":
+                t = "/" + t
             if t not in VisitedUrl and t != None: 
                 if ("http" in t or "https" in t) and t != None and t != "" and t[0] != "#":
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
@@ -184,6 +203,8 @@ def GetStaticUrl(driver, AllTags, RootUrl):
                 # print(GetMergeUrl(RootUrl, RootDomain, t))
         elif tag.find("a"): # and tag.find("a").get("href") not in VisitedUrl and tag.find("a").get("href") != None:
             t = GetUrlPath(tag.find("a").get("href"), RootDomain)
+            if t != None and t[0] != "/" and t[0] != "#":
+                t = "/" + t
             if t not in VisitedUrl and t != None:
                 if ("http" in t or "https" in t) and t != None and t != "" and t[0] != "#":
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
@@ -215,12 +236,13 @@ def GetNext(driver, RootUrl, url):
     GetPotentialInteractive(driver, RootUrl, AllTags)
     
 
-def main(RootUrl):
+def main(RootUrl, LoginUrl):
     # MitmProcess = None
     driver = None
     try:
         # MitmProcess = StartMitmProxy(MitmAddon)
         driver = UrlInit(RootUrl)
+        GetLoginSession(driver, LoginUrl)
         # AllTags = GetAllTags(driver)
         GetNext(driver, RootUrl, RootUrl)
         # VisitedUrl.append(RootUrl)
@@ -252,7 +274,8 @@ def main(RootUrl):
 
 if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"
+    LoginUrl = "http://192.168.11.129:8080/administrator"
     # print(GetDomainName("https://www.joomla.org"))
     init(autoreset=True)
-    main(RootUrl)
+    main(RootUrl, LoginUrl)
     
