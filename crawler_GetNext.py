@@ -175,6 +175,8 @@ def GetMergeUrl(RootUrl, RootDomain, path):
         else:
             return "http://" + RootDomain + path
 
+# 應該要用 urljoin()，不然自己寫頭會破
+
 def GetStaticUrl(driver, AllTags, RootUrl):
     RootDomain = GetDomainName(RootUrl)
     path = driver.current_url
@@ -183,9 +185,8 @@ def GetStaticUrl(driver, AllTags, RootUrl):
     for tag in AllTags:
         if tag.name == "a": # and tag.get("href") not in VisitedUrl and tag.get("href") != None:
             t = GetUrlPath(tag.get("href"), RootDomain)
-            print(t)
             if t != None and t[0] != "/" and t[0] != "#":
-                t = "/" + t
+                t = GetUrlPath(path + t, RootDomain)
             if t not in VisitedUrl and t != None: 
                 if ("http" in t or "https" in t) and t != None and t != "" and t[0] != "#":
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
@@ -204,7 +205,7 @@ def GetStaticUrl(driver, AllTags, RootUrl):
         elif tag.find("a"): # and tag.find("a").get("href") not in VisitedUrl and tag.find("a").get("href") != None:
             t = GetUrlPath(tag.find("a").get("href"), RootDomain)
             if t != None and t[0] != "/" and t[0] != "#":
-                t = "/" + t
+                t = GetUrlPath(path + t, RootDomain)
             if t not in VisitedUrl and t != None:
                 if ("http" in t or "https" in t) and t != None and t != "" and t[0] != "#":
                     UrlQueue.append(GetMergeUrl(RootUrl, RootDomain, t))
