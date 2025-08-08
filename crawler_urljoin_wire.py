@@ -63,17 +63,25 @@ def GetXpath(input_tag):
 
 # 現在連同非 192.168 的端點都會被收錄，所以還要檢查 domain name
 
-def ClickByXpath(driver, xpath, timeout=5):
+def RequestsCheck(driver, url):
+    requests = driver.requests
+    Domain = GetDomainName(url)
+    ApiList = []
+    for request in requests:
+        if request.method == 'POST' and Domain in request.url:
+            # print(request.url)
+            ApiList.append(request)
+    return ApiList
+
+def ClickByXpath(driver, xpath, timeout=1):
     print(f"{Fore.BLUE}Clicking by Xpath: {Fore.RED} {xpath} {Style.RESET_ALL}")
     try:
         target = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.XPATH, xpath)))
         target.click()
-        captured_request = driver.wait_for_request(r'.*', timeout=3)
-        print(captured_request.method, captured_request.url)
-        if captured_request.method == 'POST':
-            print(f"{Fore.GREEN}Clicked by Xpath: {Fore.RED} {xpath} {Style.RESET_ALL}")
-            return captured_request.url       
-        return 
+        RequestList = RequestsCheck(driver, driver.current_url)
+        if RequestList:
+            return RequestList
+        return None
     except TimeoutException:
         print(f"{Fore.RED}[!] Timeout: {xpath} {Style.RESET_ALL}")
         return None
@@ -94,17 +102,20 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
     for tag in AllTags:
         if tag.get("onclick",""):
             path = driver.current_url
-            PathsApi[path] = None
+            if path not in PathsApi:
+                PathsApi[path] = {}
             if tag.get("href") == "#":
                 continue
             xpath = GetXpath(tag)
             captured = ClickByXpath(driver, xpath)
-            print(captured)
-            PathsApi[path] = {captured:""}
+            if captured is not None:
+                for req in captured:
+                    # print("captured: ", req)
+                    PathsApi[path][req.url] = req.body.decode("utf-8")
             if driver.current_url != path and driver.current_url not in VisitedUrl:
                 UrlQueue.append(driver.current_url)
                 VisitedUrl.append(driver.current_url)
-                print(f"{Fore.RED}BTN Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {driver.current_url} {Style.RESET_ALL}")
+                print(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {driver.current_url} {Style.RESET_ALL}")
 
 def UrlInit(RootUrl):
     try:
