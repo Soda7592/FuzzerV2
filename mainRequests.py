@@ -275,6 +275,12 @@ def main(RootUrl, LoginUrl):
     # MitmProcess = None
     driver = None
     try:
+
+        # 還要把 PathsApi 裡面的 body 存的好處理一點(例如先執行 ParseBody 後再儲存) 25/08/26
+        # 然後 PathsApi 儲存的 Api 為什麼有 index.php? 這是回到主頁嗎? 需不需要處理掉? 25/08/26
+        # -> Api, Paths 不能出現環
+        
+
         # MitmProcess = StartMitmProxy(MitmAddon)
         driver, cookies = UrlInit(RootUrl, LoginUrl)
         # AllTags = GetAllTags(driver)
