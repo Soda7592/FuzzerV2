@@ -11,7 +11,7 @@ class ApiSessionHandler:
         self.session.cookies.update(self.session_cookies)
         print(f"{Fore.GREEN}ApiSessionHandler 已初始化，並載入 {len(self.session.cookies)} 個 Cookies。{Style.RESET_ALL}")
 
-    def send_api_request(self, method, url, headers=None, data=None):
+    def SendApiRequest(self, method, url, headers=None, data=None):
         if headers is None:
             headers = {}
         
