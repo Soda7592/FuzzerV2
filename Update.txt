@@ -1,0 +1,30 @@
+## 25/08/26
+
+# 還要把 PathsApi 裡面的 body 存的好處理一點(例如先執行 ParseBody 後再儲存) 25/08/26
+# 然後 PathsApi 儲存的 Api 為什麼有 index.php? 這是回到主頁嗎? 需不需要處理掉? 25/08/26
+# -> Api, Paths 不能出現環
+# 確認 InputInfo fields 中的 required 欄位，如果是 Ture 或許就表示在 API 中必須包含 25/08/26
+# text, textarea 處可能可以是注入 payload 的地方，所以就建構 API 時也可以注意這邊 25/08/26
+# 開始思考構建 text 時要怎麼寫入可辨識字串方便 traverse. 25/08/26
+
+# 應該不是 "環" 而是不能出現太多重複的 Api，雖然在不同頁面但，因為是呼叫同一個 interface，理論上檢測結果會一樣。 25/08/28
+# 新增 TotalApi，把所有的 Api 儲存起來，如果 Api 出現在裡面就不會出現在其他頁面中。 25/08/28
+# 目前這個改動只放在 mainSeleniumWire.py 中，mainParseInputs.py 中還沒有處理。 25/08/28
+
+
+## 25/08/28
+
+從 PathsApi 和 PathsPath 整理好 url 和 req body 後送入 ParseInputs 中，接著送入 ParseArg 產出字典檔。同時 dirver.get 抓 url 中的 form 欄位和輸入類型，都產完僅輸入 text 與 textarea 和 required Trur 的欄位
+都 ok 後送到 mainRequests 中。
+
+-> 目前已經統整好原先在 mainParseInputs.py 之中的功能，整合為 AnalyseInput.py 中的 BuildData 兩個函數，
+   功能包括收到 body 就產生對應的字典檔，然後針對 required 欄位產生對應的輸入值。 25/08/28
+   -> 但未來還需要在 data 中的所有 type 為 text, textarea 的部分產生 Payload 25/08/28
+
+接著要看一下怎麼統整 mainRequests.py 要怎麼把結果送入後整合成 req 送出。
+另外，在 BuildData 中，需要 AllTags，而這個 AllTags 需要從 GetAllTags 中的 driver 抓取，因為 requests 中已經有 cookies 了，能不能從 requests 中抓 AllTags
+而不是透過 driver 呢? 25/08/28
+
+Header 呢? 在 mainRequests.py 裡面的 headers 是不是每次都要生成一個最適合的? 25/08/28
+-> 找到了在 ClickByXpath 中，可以抓到 headers, 這邊連 method, body 都有 感覺程式碼還需要改
+-> 但我還沒執行過 mainSeleniumWire.py, 所以不確定對或錯，需要執行下去確認 PathsApi 內部長甚麼樣才能把整個流程接起來。
