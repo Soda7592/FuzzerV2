@@ -67,8 +67,8 @@ instance/
 
 # Scrapy stuff:
 .scrapy
-.PathsApi.txt
-.PathsPath.txt
+PathsApi.txt
+PathsPath.txt
 
 # Sphinx documentation
 docs/_build/
