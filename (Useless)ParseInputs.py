@@ -281,11 +281,20 @@ def main(RootUrl, LoginUrl):
         # 然後 PathsApi 儲存的 Api 為什麼有 index.php? 這是回到主頁嗎? 需不需要處理掉? 25/08/26
         # -> Api, Paths 不能出現環
 
+        # 應該不是 "環" 而是不能出現太多重複的 Api，雖然在不同頁面但，因為是呼叫同一個 interface，理論上檢測結果會一樣。 25/08/28
+        # 新增 TotalApi，把所有的 Api 儲存起來，如果 Api 出現在裡面就不會出現在其他頁面中。 25/08/28
+        # 但這個更改只放在 mainSeleniumWire.py 中，mainParseInputs.py 中還沒有處理。 25/08/28
+
         # 確認 InputInfo fields 中的 required 欄位，如果是 Ture 或許就表示在 API 中必須包含 25/08/26
         # text, textarea 處可能可以是注入 payload 的地方，所以就建構 API 時也可以注意這邊 25/08/26
         # 開始思考構建 text 時要怎麼寫入可辨識字串方便 traverse. 25/08/26
 
         # MitmProcess = StartMitmProxy(MitmAddon)
+
+        # urls = GetUrl()
+        # Apis = GetUrlApis(urls[i])
+
+
         driver, cookies = UrlInit(RootUrl, LoginUrl)
         driver.get("http://192.168.11.129:8080/administrator/index.php?option=com_content&view=article&layout=edit")
         body_str = 'jform%5Btitle%5D=&jform%5Balias%5D=&jform%5Barticletext%5D=&jform%5Bstate%5D=1&jform%5Bcatid%5D=2&jform%5Bfeatured%5D=0&jform%5Baccess%5D=1&jform%5Bid%5D=0&jform%5Blanguage%5D=*&jform%5Bnote%5D=&jform%5Bversion_note%5D=&jform%5Bimages%5D%5Bimage_intro%5D=&jform%5Bimages%5D%5Bfloat_intro%5D=&jform%5Bimages%5D%5Bimage_intro_alt%5D=&jform%5Bimages%5D%5Bimage_intro_caption%5D=&jform%5Bimages%5D%5Bimage_fulltext%5D=&jform%5Bimages%5D%5Bfloat_fulltext%5D=&jform%5Bimages%5D%5Bimage_fulltext_alt%5D=&jform%5Bimages%5D%5Bimage_fulltext_caption%5D=&jform%5Burls%5D%5Burla%5D=&jform%5Burls%5D%5Burlatext%5D=&jform%5Burls%5D%5Btargeta%5D=&jform%5Burls%5D%5Burlb%5D=&jform%5Burls%5D%5Burlbtext%5D=&jform%5Burls%5D%5Btargetb%5D=&jform%5Burls%5D%5Burlc%5D=&jform%5Burls%5D%5Burlctext%5D=&jform%5Burls%5D%5Btargetc%5D=&jform%5Battribs%5D%5Barticle_layout%5D=&jform%5Battribs%5D%5Bshow_title%5D=&jform%5Battribs%5D%5Blink_titles%5D=&jform%5Battribs%5D%5Bshow_tags%5D=&jform%5Battribs%5D%5Bshow_intro%5D=&jform%5Battribs%5D%5Binfo_block_position%5D=&jform%5Battribs%5D%5Binfo_block_show_title%5D=&jform%5Battribs%5D%5Bshow_category%5D=&jform%5Battribs%5D%5Blink_category%5D=&jform%5Battribs%5D%5Bshow_parent_category%5D=&jform%5Battribs%5D%5Blink_parent_category%5D=&jform%5Battribs%5D%5Bshow_associations%5D=&jform%5Battribs%5D%5Bshow_author%5D=&jform%5Battribs%5D%5Blink_author%5D=&jform%5Battribs%5D%5Bshow_create_date%5D=&jform%5Battribs%5D%5Bshow_modify_date%5D=&jform%5Battribs%5D%5Bshow_publish_date%5D=&jform%5Battribs%5D%5Bshow_item_navigation%5D=&jform%5Battribs%5D%5Bshow_icons%5D=&jform%5Battribs%5D%5Bshow_print_icon%5D=&jform%5Battribs%5D%5Bshow_email_icon%5D=&jform%5Battribs%5D%5Bshow_vote%5D=&jform%5Battribs%5D%5Bshow_hits%5D=&jform%5Battribs%5D%5Bshow_noauth%5D=&jform%5Battribs%5D%5Burls_position%5D=&jform%5Battribs%5D%5Balternative_readmore%5D=&jform%5Battribs%5D%5Barticle_page_title%5D=&jform%5Bpublish_up%5D=&jform%5Bpublish_down%5D=&jform%5Bcreated%5D=&jform%5Bcreated_by%5D=0&jform%5Bcreated_by_alias%5D=&jform%5Bmodified%5D=&jform%5Bversion%5D=&jform%5Bhits%5D=&jform%5Bid%5D=0&jform%5Bmetadesc%5D=&jform%5Bmetakey%5D=&jform%5Bxreference%5D=&jform%5Bmetadata%5D%5Brobots%5D=&jform%5Bmetadata%5D%5Bauthor%5D=&jform%5Bmetadata%5D%5Brights%5D=&jform%5Bmetadata%5D%5Bxreference%5D=&jform%5Battribs%5D%5Bshow_publishing_options%5D=&jform%5Battribs%5D%5Bshow_article_options%5D=&jform%5Battribs%5D%5Bshow_urls_images_backend%5D=&jform%5Battribs%5D%5Bshow_urls_images_frontend%5D=&task=article.cancel&return=&forcedLanguage=&3dd2e0f766b38ece91856d2ea5a6fe65=1'
@@ -295,10 +304,26 @@ def main(RootUrl, LoginUrl):
         result = GetInputInfo(AllTags)
         InputInfo["http://192.168.11.129:8080/administrator/index.php?option=com_content&view=article&layout=edit"] = result
         # print(InputInfo)
+        required_fields = {}
+        # print(InputInfo["http://192.168.11.129:8080/administrator/index.php?option=com_content&view=article&layout=edit"])
         for tag in InputInfo['http://192.168.11.129:8080/administrator/index.php?option=com_content&view=article&layout=edit'][0]['fields']:
-            print(tag)
-        print("")
+            if tag['required'] == True:
+                # print(tag)
+                required_fields[tag['name']] = tag
+                # print(f"{Fore.RED}Required: {Fore.YELLOW} {tag['name']} {Style.RESET_ALL}")
+                # print(f"{Fore.RED}Type: {Fore.YELLOW} {tag['type']} {Style.RESET_ALL}")
+
+        for key, value in required_fields.items():
+            if value['type'] == "text":
+                data[key] = "test"
+            elif value['type'] == "textarea":
+                data[key] = "test"
+            elif value['type'] == "select":
+                data[key] = value['options'][0]
+
         print(data)
+        
+                # print(f"{Fore.RED}Placeholder: {Fore.YELLOW} {tag['placeholder']} {Style.RESET_ALL}")
         # GetNext(driver, RootUrl, RootUrl)
         # VisitedUrl.append(RootUrl)
         # i = 0
