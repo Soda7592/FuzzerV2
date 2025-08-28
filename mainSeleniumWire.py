@@ -16,6 +16,7 @@ import requests
 UrlQueue = []
 VisitedUrl = []
 PathsApi = {}
+TotalApi = []
 PathsPath = {}
 ProxyHost = "http://127.0.0.1"
 ProxyPort = 8080
@@ -68,9 +69,10 @@ def RequestsCheck(driver, url):
     Domain = GetDomainName(url)
     ApiList = []
     for request in requests:
-        if request.method == 'POST' and Domain in request.url:
+        if request.method == 'POST' and Domain in request.url and request.url not in ApiList:
             # print(request.url)
             ApiList.append(request)
+            TotalApi.append(request)
     return ApiList
 
 def ClickByXpath(driver, xpath, timeout=1):
