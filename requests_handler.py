@@ -10,7 +10,7 @@ class ApiSessionHandler:
         self.session_cookies = {c['name']: c['value'] for c in cookies}
         self.session.cookies.update(self.session_cookies)
         print(f"{Fore.GREEN}ApiSessionHandler 已初始化，並載入 {len(self.session.cookies)} 個 Cookies。{Style.RESET_ALL}")
-
+    
     def SendApiRequest(self, method, url, headers=None, data=None):
         if headers is None:
             headers = {}
@@ -33,3 +33,5 @@ class ApiSessionHandler:
         except requests.exceptions.RequestException as e:
             print(f"{Fore.RED}API 請求失敗: {e}{Style.RESET_ALL}")
             return None
+    
+    

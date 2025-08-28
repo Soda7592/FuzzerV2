@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 import subprocess
 from requests_handler import ApiSessionHandler
 from ParseArg import ParseBody
+from AnalyseInput import BuildData
 
 UrlQueue = []
 VisitedUrl = []
@@ -271,6 +272,7 @@ def GetNext(driver, RootUrl, url):
     GetPotentialInteractive(driver, RootUrl, AllTags)
     
 
+
 def main(RootUrl, LoginUrl):
     # MitmProcess = None
     driver = None
@@ -283,20 +285,23 @@ def main(RootUrl, LoginUrl):
 
         # MitmProcess = StartMitmProxy(MitmAddon)
         driver, cookies = UrlInit(RootUrl, LoginUrl)
-        # AllTags = GetAllTags(driver)
+        url = "http://192.168.11.129:8080/administrator/index.php?option=com_content&view=article&layout=edit"
+        driver.get(url)
+        AllTags = GetAllTags(driver)
         RequestHandler = ApiSessionHandler(cookies)
         body_str = 'jform%5Btitle%5D=&jform%5Balias%5D=&jform%5Barticletext%5D=&jform%5Bstate%5D=1&jform%5Bcatid%5D=2&jform%5Bfeatured%5D=0&jform%5Baccess%5D=1&jform%5Bid%5D=0&jform%5Blanguage%5D=*&jform%5Bnote%5D=&jform%5Bversion_note%5D=&jform%5Bimages%5D%5Bimage_intro%5D=&jform%5Bimages%5D%5Bfloat_intro%5D=&jform%5Bimages%5D%5Bimage_intro_alt%5D=&jform%5Bimages%5D%5Bimage_intro_caption%5D=&jform%5Bimages%5D%5Bimage_fulltext%5D=&jform%5Bimages%5D%5Bfloat_fulltext%5D=&jform%5Bimages%5D%5Bimage_fulltext_alt%5D=&jform%5Bimages%5D%5Bimage_fulltext_caption%5D=&jform%5Burls%5D%5Burla%5D=&jform%5Burls%5D%5Burlatext%5D=&jform%5Burls%5D%5Btargeta%5D=&jform%5Burls%5D%5Burlb%5D=&jform%5Burls%5D%5Burlbtext%5D=&jform%5Burls%5D%5Btargetb%5D=&jform%5Burls%5D%5Burlc%5D=&jform%5Burls%5D%5Burlctext%5D=&jform%5Burls%5D%5Btargetc%5D=&jform%5Battribs%5D%5Barticle_layout%5D=&jform%5Battribs%5D%5Bshow_title%5D=&jform%5Battribs%5D%5Blink_titles%5D=&jform%5Battribs%5D%5Bshow_tags%5D=&jform%5Battribs%5D%5Bshow_intro%5D=&jform%5Battribs%5D%5Binfo_block_position%5D=&jform%5Battribs%5D%5Binfo_block_show_title%5D=&jform%5Battribs%5D%5Bshow_category%5D=&jform%5Battribs%5D%5Blink_category%5D=&jform%5Battribs%5D%5Bshow_parent_category%5D=&jform%5Battribs%5D%5Blink_parent_category%5D=&jform%5Battribs%5D%5Bshow_associations%5D=&jform%5Battribs%5D%5Bshow_author%5D=&jform%5Battribs%5D%5Blink_author%5D=&jform%5Battribs%5D%5Bshow_create_date%5D=&jform%5Battribs%5D%5Bshow_modify_date%5D=&jform%5Battribs%5D%5Bshow_publish_date%5D=&jform%5Battribs%5D%5Bshow_item_navigation%5D=&jform%5Battribs%5D%5Bshow_icons%5D=&jform%5Battribs%5D%5Bshow_print_icon%5D=&jform%5Battribs%5D%5Bshow_email_icon%5D=&jform%5Battribs%5D%5Bshow_vote%5D=&jform%5Battribs%5D%5Bshow_hits%5D=&jform%5Battribs%5D%5Bshow_noauth%5D=&jform%5Battribs%5D%5Burls_position%5D=&jform%5Battribs%5D%5Balternative_readmore%5D=&jform%5Battribs%5D%5Barticle_page_title%5D=&jform%5Bpublish_up%5D=&jform%5Bpublish_down%5D=&jform%5Bcreated%5D=&jform%5Bcreated_by%5D=0&jform%5Bcreated_by_alias%5D=&jform%5Bmodified%5D=&jform%5Bversion%5D=&jform%5Bhits%5D=&jform%5Bid%5D=0&jform%5Bmetadesc%5D=&jform%5Bmetakey%5D=&jform%5Bxreference%5D=&jform%5Bmetadata%5D%5Brobots%5D=&jform%5Bmetadata%5D%5Bauthor%5D=&jform%5Bmetadata%5D%5Brights%5D=&jform%5Bmetadata%5D%5Bxreference%5D=&jform%5Battribs%5D%5Bshow_publishing_options%5D=&jform%5Battribs%5D%5Bshow_article_options%5D=&jform%5Battribs%5D%5Bshow_urls_images_backend%5D=&jform%5Battribs%5D%5Bshow_urls_images_frontend%5D=&task=article.cancel&return=&forcedLanguage=&3dd2e0f766b38ece91856d2ea5a6fe65=1'
-        data = ParseBody(body_str)
+        data, method = BuildData(AllTags, url, body_str)
+        print(data)
         api_record = {
-            'url': 'http://192.168.11.129:8080/administrator/index.php',
-            'method': 'POST',
+            'url': url,
+            'method': method,
             'headers': {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Origin': 'http://192.168.11.129:8080',
-                'Referer': 'http://192.168.11.129:8080/index.php/submit-an-article?a_id=0',
+                'Referer': 'http://192.168.11.129:8080/index.php/submit-an-article?a_id=1',
                 'Sec-Fetch-Dest': 'document',
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-Site': 'same-origin',
@@ -306,7 +311,7 @@ def main(RootUrl, LoginUrl):
         }
         response = RequestHandler.SendApiRequest(api_record['method'], api_record['url'], api_record['headers'], api_record['body'])
         if response:
-            print(f"{Fore.GREEN}API 請求成功！回傳內容: {response.text}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}API 請求成功！回傳內容: {response.status_code}{Style.RESET_ALL}")
         else:
             print(f"{Fore.RED}API 請求失敗，請檢查日誌。{Style.RESET_ALL}")
         
