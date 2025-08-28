@@ -1,6 +1,7 @@
 import requests
 import json
 from colorama import Fore, Style, init
+from bs4 import BeautifulSoup
 
 init(autoreset=True)
 
@@ -11,10 +12,15 @@ class ApiSessionHandler:
         self.session.cookies.update(self.session_cookies)
         print(f"{Fore.GREEN}ApiSessionHandler 已初始化，並載入 {len(self.session.cookies)} 個 Cookies。{Style.RESET_ALL}")
     
+    def GetAllTagsFromRequest(self, url):
+        response = self.session.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        AllTags = soup.find_all()
+        return AllTags
+    
     def SendApiRequest(self, method, url, headers=None, data=None):
         if headers is None:
             headers = {}
-        
         try:
             # 使用 self.session.request 發送請求，它會自動帶上 cookies
             response = self.session.request(
