@@ -113,7 +113,7 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
             if captured is not None:
                 for req in captured:
                     # print("captured: ", req)
-                     PathsApi[path][req.url] = { "body":req.body.decode("utf-8"), "method":req.method, "headers":req.headers }
+                    PathsApi[path][req.url] = {"body":req.body.decode("utf-8"), "method":req.method, "headers":req.headers}
             if driver.current_url != path and driver.current_url not in VisitedUrl:
                 UrlQueue.append(driver.current_url)
                 VisitedUrl.append(driver.current_url)
