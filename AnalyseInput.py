@@ -1,34 +1,20 @@
 from bs4 import BeautifulSoup
 from colorama import Fore, Style, init
 import json
+from ParseArg import ParseBody
 
 def GetSelectOptions(select_tag):
-    """
-    從一個 BeautifulSoup <select> 標籤中提取所有 <option> 的值。
-    
-    Args:
-        select_tag (BeautifulSoup.Tag): <select> 標籤物件。
-        
-    Returns:
-        list: 包含所有 <option> value 的列表，如果沒有 value 則使用文本內容。
-    """
     options_list = []
-    # 在 <select> 標籤內部尋找所有 <option> 標籤
     options = select_tag.find_all('option')
     
     for option in options:
-        # 優先使用 value 屬性，如果不存在，則使用選項的文本內容
         option_value = option.get('value', option.get_text(strip=True))
         options_list.append(option_value)
         
     return options_list
 
 def GetInputInfo(all_bs_tags):
-    """
-    從 BeautifulSoup 標籤列表中，提取 <form> 和 <input> 等輸入欄位的詳細資訊。
-    此版本已更新，能偵測 'required' 屬性。
-    """
-    print(f"\n{Fore.BLUE}--- 提取表單及輸入欄位資訊 ---{Style.RESET_ALL}")
+    # print(f"\n{Fore.BLUE}--- 提取表單及輸入欄位資訊 ---{Style.RESET_ALL}")
     
     forms_info = []
 
@@ -63,7 +49,6 @@ def GetInputInfo(all_bs_tags):
                     'required': 'required' in field.attrs # 這裡檢查 'required' 屬性
                 }
             else:
-                # 忽略提交類型按鈕
                 if field_type in ['submit', 'button', 'image', 'reset']:
                     continue
                 
@@ -89,5 +74,25 @@ def GetInputInfo(all_bs_tags):
             'fields': fields_info
         })
         
-    print(f"{Fore.GREEN}成功提取 {len(forms_info)} 個表單的資訊。{Style.RESET_ALL}")
+    # print(f"{Fore.GREEN}成功提取 {len(forms_info)} 個表單的資訊。{Style.RESET_ALL}")
     return forms_info
+
+def BuildData(AllTags, url, body_str) :
+    data = ParseBody(body_str)
+    InputInfo = {}
+    InputInfo[url] = GetInputInfo(AllTags)
+    method = InputInfo[url][0]['method']
+    NonEmpty_fields = {}
+    for tag in InputInfo[url][0]['fields']:
+        if tag['required'] == True:
+            NonEmpty_fields[tag['name']] = tag
+        elif tag['type'] == 'text' or tag['type'] == 'textarea' :
+            NonEmpty_fields[tag['name']] = tag
+    for key, value in NonEmpty_fields.items():
+        if value['type'] == "text":
+            data[key] = "test"
+        elif value['type'] == "textarea":
+            data[key] = "test"
+        elif value['type'] == "select":
+            data[key] = value['options'][0]
+    return data, method
