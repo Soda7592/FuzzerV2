@@ -422,6 +422,9 @@ def main(RootUrl, LoginUrl):
         #     StopMitmProxy(MitmProcess)
         # 無論是否出錯皆嘗試儲存樹狀圖
         Save()
+        # 目前 Session 會過期，然後看能不能弄成 Ctrl C 之後一定會有東西寫入 json
+
+
     # print("\n\nPathsAPIs:")
     # for path in PathsApi:
     #     print(f"{Fore.BLUE}[*]{path}{Style.RESET_ALL}")
