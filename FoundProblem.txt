@@ -20,3 +20,17 @@
 # 25/09/04
 - 我發現測到後面 Session 會過期，可能需要定期更換 Session
 - 看能不能修改成 Ctrl + C 後一定會寫入 JSON
+
+# 25/09/09
+- 看能不能修改成 Ctrl + C 後一定會寫入 JSON [V]
+- 我發現測到後面 Session 會過期，可能需要定期更換 Session (定期刷新的邏輯反而不好處理，在 Joomla admin pannel 可以設定 Session lifetime.) [?]
+- admin pannel 的 installer 頁面不要動，這邊有太多插件是無關的  (多一個 function 設定是某個網頁不要動)
+- 多一個功能是設定某些 API 不要動，例如 logout 的 api 不要動 [V]
+- 在 Processing 處加上進度條 (已完成/未完成) 方便我查看目前進度。 (Grok 版有)
+    - 有沒有可能加上 thread 加快速度 ?
+- 在測試階段時點擊按鈕少了 required 值會不會可能降低能探索到的深度 (這好像無所謂)
+- string index out of range (QQ)
+
+- 目前主要問題 -> 樹狀結構建立問題 (應該要選擇一個 stable 的 cursor 或 grok 的版本，先確定可以正常掃描網站，然後自己改樹狀結構的寫入邏輯)
+    1. 建立樹狀結構根結點選擇問題 (Wire.py 版本)
+    2. 樹狀結構無法呈現全部的 urls，例如 admin pannel 裡面有一堆 url，但即使檢測到也掃描過 url，但就是沒辦法被記載入樹狀結構 (Grok.py 版本)
