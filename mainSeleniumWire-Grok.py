@@ -20,59 +20,62 @@ from collections import deque
 
 UrlQueue = []
 VisitedUrl = set()
+ParentMap = {}
+# UrlToApis = {}
+UrlToNode = {}
+node_dict = {}
 PathsApi = {}
 TotalApi = set()
 PathsPath = {}
 ProxyHost = "http://127.0.0.1"
 ProxyPort = 8080
-
+EXCLUDE_KEYWORDS = {"logout", "install", "installer", "plugin"}
 # 控制是否顯示詳細除錯資訊
 VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 100
+MAX_PROCESSED = 10
 RootStartUrl = None
 
-# 以 URL 為鍵的樹狀圖：即時維護節點與邊，以及節點上的 APIs
-CrawlerTree = {}
+# 取消樹狀圖資料結構，採線性紀錄
 
 def debug(message):
     if VERBOSE:
         print(message)
 
-def ensure_node(url):
-    if url is None:
-        return
-    if url not in CrawlerTree:
-        CrawlerTree[url] = {"apis": [], "children": []}
+# def ensure_node(url):
+#     if url is None:
+#         return
+#     if url not in CrawlerTree:
+#         CrawlerTree[url] = {"apis": [], "children": []}
 
-def add_edge(parent_url, child_url):
-    if parent_url is None or child_url is None:
-        return
-    ensure_node(parent_url)
-    ensure_node(child_url)
-    if child_url not in CrawlerTree[parent_url]["children"]:
-        CrawlerTree[parent_url]["children"].append(child_url)
+# def add_edge(parent_url, child_url):
+#     if parent_url is None or child_url is None:
+#         return
+#     ensure_node(parent_url)
+#     ensure_node(child_url)
+#     if child_url not in CrawlerTree[parent_url]["children"]:
+#         CrawlerTree[parent_url]["children"].append(child_url)
 
-def add_api_to_node(url, api_info):
-    ensure_node(url)
-    normalized = dict(api_info)
-    headers_val = normalized.get("headers")
-    if isinstance(headers_val, dict):
-        normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
-    else:
-        try:
-            normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
-        except Exception:
-            normalized["headers"] = str(headers_val)
-    body_val = normalized.get("body")
-    if isinstance(body_val, (bytes, bytearray)):
-        try:
-            normalized["body"] = body_val.decode("utf-8", errors="ignore")
-        except Exception:
-            normalized["body"] = str(body_val)
-    CrawlerTree[url]["apis"].append(normalized)
+# def add_api_to_node(url, api_info):
+#     ensure_node(url)
+#     normalized = dict(api_info)
+#     headers_val = normalized.get("headers")
+#     if isinstance(headers_val, dict):
+#         normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
+#     else:
+#         try:
+#             normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
+#         except Exception:
+#             normalized["headers"] = str(headers_val)
+#     body_val = normalized.get("body")
+#     if isinstance(body_val, (bytes, bytearray)):
+#         try:
+#             normalized["body"] = body_val.decode("utf-8", errors="ignore")
+#         except Exception:
+#             normalized["body"] = str(body_val)
+#     CrawlerTree[url]["apis"].append(normalized)
 
 def GetLoginSession(driver, LoginUrl):
     driver.get(LoginUrl)
@@ -113,20 +116,21 @@ def RequestsCheck(driver, url):
     Domain = GetDomainName(url)
     ApiList = []
     for request in requests:
-        if request.method == 'POST' and Domain in request.url and request.url not in TotalApi:
+        url = request.url.rstrip("/")
+        if request.method == 'POST' and Domain in url and url not in TotalApi:
             try:
                 headers_dict = {str(k): str(v) for k, v in request.headers.items()}
             except Exception:
                 headers_dict = str(request.headers)
             body_text = request.body.decode("utf-8", errors="ignore") if isinstance(request.body, (bytes, bytearray)) else str(request.body)
             api_info = {
-                "url": str(request.url),
+                "url": str(url),
                 "method": str(request.method),
                 "headers": headers_dict,
                 "body": body_text
             }
             ApiList.append(api_info)
-            TotalApi.add(request.url)
+            TotalApi.add(url)
     return ApiList
 
 def ClickByXpath(driver, xpath, timeout=1):
@@ -134,7 +138,7 @@ def ClickByXpath(driver, xpath, timeout=1):
     try:
         target = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.XPATH, xpath)))
         target.click()
-        RequestList = RequestsCheck(driver, driver.current_url)
+        RequestList = RequestsCheck(driver, driver.current_url.rstrip("/"))
         if RequestList:
             return RequestList
         return None
@@ -153,7 +157,7 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
     RootDomain = GetDomainName(RootUrl)
     for tag in AllTags:
         if tag.get("onclick",""):
-            path = driver.current_url
+            path = driver.current_url.rstrip("/")
             if path not in PathsApi:
                 PathsApi[path] = {}
             if tag.get("href") == "#":
@@ -163,14 +167,13 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
             if captured is not None:
                 for req in captured:
                     PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
-                    add_api_to_node(path, req)
                     debug(f"captured api url: {req['url']}")
             if driver.current_url != path and driver.current_url not in VisitedUrl:
-                new_url = driver.current_url
+                new_url = driver.current_url.rstrip("/")
                 if IsHttpUrl(new_url) and not should_exclude_url(new_url):
                     UrlQueue.append(new_url)
                     VisitedUrl.add(new_url)
-                    add_edge(path, new_url)
+                    ParentMap[new_url] = path
                     debug(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {new_url} {Style.RESET_ALL}")
 
 def UrlInit(RootUrl):
@@ -181,8 +184,8 @@ def UrlInit(RootUrl):
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(RootUrl)
-        ensure_node(RootUrl)  # 明確確保根節點
         VisitedUrl.add(RootUrl)
+        ParentMap[RootUrl] = None
         time.sleep(2)
         username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-username")))
         password = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-passwd")))
@@ -236,8 +239,6 @@ def GetUrlPath(url, RootDomain):
 def GetMergeUrl(current, path):
     return urljoin(current, path)
 
-EXCLUDE_KEYWORDS = {"logout", "install", "installer", "plugin"}
-
 def should_exclude_url(url):
     if not url:
         return False
@@ -256,7 +257,7 @@ def IsHttpUrl(url):
 
 def GetStaticUrl(driver, AllTags, RootUrl):
     RootDomain = GetDomainName(RootUrl)
-    path = driver.current_url
+    path = driver.current_url.rstrip("/")
     if path not in PathsPath:
         PathsPath[path] = []
     for tag in AllTags:
@@ -266,26 +267,26 @@ def GetStaticUrl(driver, AllTags, RootUrl):
                 continue
             t = GetUrlPath(href_val, RootDomain)
             if t and t[0] != "#":
-                url = GetMergeUrl(path, t)
+                url = GetMergeUrl(path, t).rstrip("/")
                 if url not in VisitedUrl and url and not should_exclude_url(url) and IsHttpUrl(url):
                     debug(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {url} {Style.RESET_ALL}")
                     UrlQueue.append(url)
                     PathsPath[path].append(t)
                     VisitedUrl.add(url)
-                    add_edge(path, url)
+                    ParentMap[url] = path
         elif tag.find("a"):
             href_val = tag.find("a").get("href")
             if should_exclude_url(href_val):
                 continue
             t = GetUrlPath(href_val, RootDomain)
             if t and t[0] != "#":
-                url = GetMergeUrl(path, t)
+                url = GetMergeUrl(path, t).rstrip("/")
                 if url not in VisitedUrl and url and not should_exclude_url(url) and IsHttpUrl(url):
                     debug(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {url} {Style.RESET_ALL}")
                     UrlQueue.append(url)
                     PathsPath[path].append(t)
                     VisitedUrl.add(url)
-                    add_edge(path, url)
+                    ParentMap[url] = path
     return UrlQueue
 
 def PrintUrlQueue(UrlQueue):
@@ -297,19 +298,19 @@ def GetNext(driver, RootUrl, url):
     ProcessedCount += 1
     pending = max(len(UrlQueue) - ProcessedCount, 0)
     print(f"{Fore.GREEN}Processing (done/pending) {ProcessedCount}/{pending}: {Style.RESET_ALL}  {Fore.RED}{url}{Style.RESET_ALL}")
-    ensure_node(url)
+    # 線性處理，不建樹
     driver.get(url)
     time.sleep(3)
     AllTags = GetAllTags(driver)
     GetStaticUrl(driver, AllTags, url)
     GetPotentialInteractive(driver, RootUrl, AllTags)
-    print(f"{Fore.YELLOW}Current CrawlerTree nodes: {len(CrawlerTree)}{Style.RESET_ALL}")
-    if ProcessedCount % 50 == 0:
-        print(f"{Fore.YELLOW}Periodic save at {ProcessedCount}{Style.RESET_ALL}")
-        Save(root_url=RootStartUrl, filename=GetTime())
+
+    # if ProcessedCount % 50 == 0:
+    #     print(f"{Fore.YELLOW}Periodic save at {ProcessedCount}{Style.RESET_ALL}")
+    #     Save(root_url=RootStartUrl, filename=GetTime())
     if ProcessedCount >= MAX_PROCESSED:
         print(f"{Fore.YELLOW}Reached limit {MAX_PROCESSED}, saving and exiting...{Style.RESET_ALL}")
-        Save(root_url=RootStartUrl)
+        # Save(root_url=RootStartUrl)
         raise SystemExit(0)
 
 def GetTime():
@@ -317,55 +318,19 @@ def GetTime():
     filename = now.strftime("%Y_%m_%d_%H") + ".json"
     return filename
 
-def build_nested_tree(root_url):
-    # 疊代方式建樹，避免遞迴深度問題
-    result = {"url": root_url, "apis": CrawlerTree.get(root_url, {"apis": [], "children": []})["apis"], "children": []}
-    stack = [(root_url, result)]
-    visited = set()
-
-    while stack:
-        current_url, current_node = stack.pop()
-        if current_url in visited:
-            continue
-        visited.add(current_url)
-        children = CrawlerTree.get(current_url, {"children": []})["children"]
-        for child in children:
-            child_node = {"url": child, "apis": CrawlerTree.get(child, {"apis": [], "children": []})["apis"], "children": []}
-            current_node["children"].append(child_node)
-            stack.append((child, child_node))
-    return result
-
-def _infer_root_url():
-    all_nodes = set(CrawlerTree.keys())
-    all_children = set()
-    for node in CrawlerTree.values():
-        for child in node["children"]:
-            all_children.add(child)
-    candidates = list(all_nodes - all_children)
-    if candidates:
-        return candidates[0]
-    return next(iter(all_nodes), None)
-
-def Save(root_url=None, filename=None):
+def Save():
     try:
-        if filename is None:
-            filename = GetTime()
-        if root_url is None:
-            if RootStartUrl:
-                root_url = RootStartUrl
-            else:
-                root_url = _infer_root_url()
-                if root_url is None and VisitedUrl:
-                    root_url = next(iter(VisitedUrl))
-        if root_url is None:
-            print(f"{Fore.RED}No root URL available to save tree.{Style.RESET_ALL}")
-            return
-        print(f"{Fore.YELLOW}Before save - Tree nodes: {len(CrawlerTree)}, Visited: {len(VisitedUrl)}, Inferred root: {root_url}{Style.RESET_ALL}")
-        tree = build_nested_tree(root_url)
+        filename = GetTime()
+        data = {
+            "visited": list(VisitedUrl),
+            "queue": list(UrlQueue),
+            "paths": PathsPath,
+            "apis": PathsApi,
+        }
         abs_path = os.path.abspath(filename)
         with open(abs_path, 'w', encoding='utf-8') as f:
-            json.dump(tree, f, ensure_ascii=False, indent=2)
-        print(f"{Fore.GREEN}Saved tree to {abs_path}{Style.RESET_ALL}")
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}Save failed: {e}{Style.RESET_ALL}")
 
@@ -376,17 +341,34 @@ def safe_save():
         print(f"{Fore.RED}Safe save failed: {e}{Style.RESET_ALL}")
 
 def handle_interrupt(sig, frame):
-    print(f"\n{Fore.YELLOW}Received interrupt signal, saving data...{Style.RESET_ALL}")
-    safe_save()
+    TestPrentMap()
+    # print(f"\n{Fore.YELLOW}Received interrupt signal, saving data...{Style.RESET_ALL}")
+    # safe_save()
     sys.exit(0)
 
+def TestPrentMap():
+    for url in ParentMap:
+        print(f"{Fore.RED}url: {url}{Style.RESET_ALL} \n-> {Fore.YELLOW}Parent: {ParentMap[url]}{Style.RESET_ALL}\n")
+
+def TestUrlToNode():
+    for url in ParentMap:
+        UrlToNode[url] = {"url":url, "children":[]}
+    for url, parent in ParentMap.items():
+        if parent is not None:
+            UrlToNode[parent]["children"].append(UrlToNode[url])
+    with open('tree.json', 'w', encoding='utf-8') as f:
+        json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
+    # for url in UrlToNode:
+    #     print(f"{Fore.RED}{url}{Style.RESET_ALL} \n-> {Fore.YELLOW}Children: {UrlToNode[url]['children']}{Style.RESET_ALL}\n")
+
 def main(RootUrl, LoginUrl):
-    global RootStartUrl
-    RootStartUrl = RootUrl  # 明確設定根為 index.php
+    # global RootStartUrl
+    # RootStartUrl = RootUrl  # 明確設定根為 index.php
     signal.signal(signal.SIGINT, handle_interrupt)
     signal.signal(signal.SIGTERM, handle_interrupt)
-    atexit.register(safe_save)
-    
+    # atexit.register(safe_save)
+    VisitedUrl.add("http://192.168.11.129:8080")
+    VisitedUrl.add("http://192.168.11.129:8080/")
     driver = None
     try:
         driver = UrlInit(RootUrl)
@@ -402,11 +384,13 @@ def main(RootUrl, LoginUrl):
         pass
     except Exception as e:
         print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
-        Save(root_url=RootStartUrl)
+        # Save(root_url=RootStartUrl)
     finally:
         if driver:
             driver.close()
             print(f"{Fore.GREEN}Driver closed.{Style.RESET_ALL}")
+            TestUrlToNode()
+            #TestPrentMap()
 
 if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"

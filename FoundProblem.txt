@@ -39,11 +39,11 @@
 # 25/09/10
 
 建立四個物件
-- VisitedUrl (set), 用來儲存走訪過什麼 url，不要出現環(原本的就可以)
-- ParentMap (dict), {url:parent} 可以在當前 url 在找尋網頁中的 <a> tag 時匯入，例如 index.php 網頁中有 article 就會是當 driver 在 /index.php 時匯入資訊 {'/article':'/index.php'}
+- [V] VisitedUrl (set), 用來儲存走訪過什麼 url，不要出現環(原本的就可以)
+- [V] ParentMap (dict), {url:parent} 可以在當前 url 在找尋網頁中的 <a> tag 時匯入，例如 index.php 網頁中有 article 就會是當 driver 在 /index.php 時匯入資訊 {'/article':'/index.php'}
 - UrlToApis (dict), {url:apis:{}} 因為每個 url 底下的 api 不會具有深度的特性，所以直接另外取出來儲存。
-- UrlToNode (dict), {url:dict} 這個在最後建樹階段時建立，是在未來方便查詢這個樹所建立的 index 表
-                    (str:dict)
+- [V] UrlToNode (dict), {url:children} 這個在最後建樹階段時建立，是在未來方便查詢這個樹所建立的 index 表
+                    {str:list}
 - 建樹: 走訪 ParentMap，因為在掃描過程使用的是 BFS，所以 ParentMap 匯入的 Key 值順序會契合匯入的節點 Lavel，不會有提前需要匯入較深節點的問題，所以 Tree 會製作成
 {
     rooturl:
@@ -73,3 +73,7 @@
 這邊只存 url 即可，因為 api 儲存僅收錄當前頁面中的，api，不需要考慮深度問題，所以僅需要一個扁平的 {url:{apis} }(裡面儲存的資料必須要包含整個 request body, header 等)
 
 未來要查詢時就能透過 O(1) 的時間查詢到任何 url 之下的 children，同時能夠透過 url 查詢 api，甚至也能透過 ParentMap 查詢 previous 的 node。
+
+(以上全部 url 皆已絕對路徑儲存，修改 Grok 那份 code 比較快，因為裡面還有 exclude url 的功能在)
+
+目前 Grok 版本已經能正確輸出 tree.json，但還沒讓 Api 也 sync 起來
