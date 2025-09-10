@@ -34,3 +34,42 @@
 - 目前主要問題 -> 樹狀結構建立問題 (應該要選擇一個 stable 的 cursor 或 grok 的版本，先確定可以正常掃描網站，然後自己改樹狀結構的寫入邏輯)
     1. 建立樹狀結構根結點選擇問題 (Wire.py 版本)
     2. 樹狀結構無法呈現全部的 urls，例如 admin pannel 裡面有一堆 url，但即使檢測到也掃描過 url，但就是沒辦法被記載入樹狀結構 (Grok.py 版本)
+
+
+# 25/09/10
+
+建立四個物件
+- VisitedUrl (set), 用來儲存走訪過什麼 url，不要出現環(原本的就可以)
+- ParentMap (dict), {url:parent} 可以在當前 url 在找尋網頁中的 <a> tag 時匯入，例如 index.php 網頁中有 article 就會是當 driver 在 /index.php 時匯入資訊 {'/article':'/index.php'}
+- UrlToApis (dict), {url:apis:{}} 因為每個 url 底下的 api 不會具有深度的特性，所以直接另外取出來儲存。
+- UrlToNode (dict), {url:dict} 這個在最後建樹階段時建立，是在未來方便查詢這個樹所建立的 index 表
+                    (str:dict)
+- 建樹: 走訪 ParentMap，因為在掃描過程使用的是 BFS，所以 ParentMap 匯入的 Key 值順序會契合匯入的節點 Lavel，不會有提前需要匯入較深節點的問題，所以 Tree 會製作成
+{
+    rooturl:
+        children: {
+            suburl1: {
+                children :{
+                    subsuburl1 : {
+
+                    }
+                }
+            }, 
+            suburl2: {
+                children :{
+                    subsuburl1 :{
+
+                    }
+                }
+            }
+            ...
+        }
+}
+
+在建樹時因為 ParentMap 的插入順序，會讓 suburl 層先被匯入(再搭配指向的 parent 可以確定應該將節點放在樹的何處)，
+這時候就能在 UrlToNode 裡面建立第一個值 {root:[suburl1, suburl2]}，當 suburl1 都走過一次後會開始走到 suburl1 會建立為 {root:[suburl1, suburl2], suburl1:[]}
+如此往復就能把 node 資訊完好無缺的存入 UrlToNode 裡面。
+
+這邊只存 url 即可，因為 api 儲存僅收錄當前頁面中的，api，不需要考慮深度問題，所以僅需要一個扁平的 {url:{apis} }(裡面儲存的資料必須要包含整個 request body, header 等)
+
+未來要查詢時就能透過 O(1) 的時間查詢到任何 url 之下的 children，同時能夠透過 url 查詢 api，甚至也能透過 ParentMap 查詢 previous 的 node。
