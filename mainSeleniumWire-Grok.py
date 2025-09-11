@@ -17,6 +17,9 @@ import atexit
 import signal
 import sys
 from collections import deque
+from requests_handler import ApiSessionHandler
+from ParseArg import ParseBody
+from AnalyseInput import BuildData
 
 UrlQueue = []
 VisitedUrl = set()
@@ -35,7 +38,7 @@ VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 10
+MAX_PROCESSED = 100
 RootStartUrl = None
 
 # 取消樹狀圖資料結構，採線性紀錄
@@ -321,15 +324,10 @@ def GetTime():
 def Save():
     try:
         filename = GetTime()
-        data = {
-            "visited": list(VisitedUrl),
-            "queue": list(UrlQueue),
-            "paths": PathsPath,
-            "apis": PathsApi,
-        }
         abs_path = os.path.abspath(filename)
+        BuildUrlToNode()
         with open(abs_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
         print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}Save failed: {e}{Style.RESET_ALL}")
@@ -341,23 +339,21 @@ def safe_save():
         print(f"{Fore.RED}Safe save failed: {e}{Style.RESET_ALL}")
 
 def handle_interrupt(sig, frame):
-    TestPrentMap()
-    # print(f"\n{Fore.YELLOW}Received interrupt signal, saving data...{Style.RESET_ALL}")
-    # safe_save()
+    # TestPrentMap()
+    print(f"\n{Fore.YELLOW}Received interrupt signal, saving data...{Style.RESET_ALL}")
+    safe_save()
     sys.exit(0)
 
 def TestPrentMap():
     for url in ParentMap:
         print(f"{Fore.RED}url: {url}{Style.RESET_ALL} \n-> {Fore.YELLOW}Parent: {ParentMap[url]}{Style.RESET_ALL}\n")
 
-def TestUrlToNode():
+def BuildUrlToNode():
     for url in ParentMap:
         UrlToNode[url] = {"url":url, "children":[]}
     for url, parent in ParentMap.items():
         if parent is not None:
             UrlToNode[parent]["children"].append(UrlToNode[url])
-    with open('tree.json', 'w', encoding='utf-8') as f:
-        json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
     # for url in UrlToNode:
     #     print(f"{Fore.RED}{url}{Style.RESET_ALL} \n-> {Fore.YELLOW}Children: {UrlToNode[url]['children']}{Style.RESET_ALL}\n")
 
@@ -366,7 +362,7 @@ def main(RootUrl, LoginUrl):
     # RootStartUrl = RootUrl  # 明確設定根為 index.php
     signal.signal(signal.SIGINT, handle_interrupt)
     signal.signal(signal.SIGTERM, handle_interrupt)
-    # atexit.register(safe_save)
+    atexit.register(safe_save)
     VisitedUrl.add("http://192.168.11.129:8080")
     VisitedUrl.add("http://192.168.11.129:8080/")
     driver = None
@@ -389,7 +385,7 @@ def main(RootUrl, LoginUrl):
         if driver:
             driver.close()
             print(f"{Fore.GREEN}Driver closed.{Style.RESET_ALL}")
-            TestUrlToNode()
+            # TestUrlToNode()
             #TestPrentMap()
 
 if __name__ == "__main__":

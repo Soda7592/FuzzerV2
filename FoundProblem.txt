@@ -77,3 +77,10 @@
 (以上全部 url 皆已絕對路徑儲存，修改 Grok 那份 code 比較快，因為裡面還有 exclude url 的功能在)
 
 目前 Grok 版本已經能正確輸出 tree.json，但還沒讓 Api 也 sync 起來
+
+## 25/09/11 
+- 把 API 的部分用之前的 AnalyseInput 和 Requests_handler 整理好再匯入 Json
+    - 目前是 BFS 的方式，如果中途突然 get 出去抓 forms 的資訊可能導致邏輯出錯，到時候 bug 會修不完
+    - 應該要嘗試如何把抓 API 的動作混合進目前的業務流程中。
+    1. 先 init requests_handler, 給他 cookies/session 
+    2. 我需要 AllTags, body_text, method, headers, url, 
