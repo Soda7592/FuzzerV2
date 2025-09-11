@@ -26,6 +26,7 @@ VisitedUrl = set()
 ParentMap = {}
 # UrlToApis = {}
 UrlToNode = {}
+UrlToApis = {}
 node_dict = {}
 PathsApi = {}
 TotalApi = set()
@@ -38,7 +39,7 @@ VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 100
+MAX_PROCESSED = 20
 RootStartUrl = None
 
 # 取消樹狀圖資料結構，採線性紀錄
@@ -169,7 +170,15 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
             captured = ClickByXpath(driver, xpath)
             if captured is not None:
                 for req in captured:
-                    PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
+                    data, method = BuildData(AllTags, req['url'], req['body'])
+                    if data is None:
+                        if req['method'] == 'POST' and req['body'] != '':
+                            PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
+                            print(f"{{path: {path}, url: {req['url']}}} Missing forms, but POST with body")
+                        # print(f"{Fore.RED}Data is None for {req['body']}{Style.RESET_ALL}")
+                        pass
+                    else:
+                        PathsApi[path][req['url']] = {"body":data, "method":method, "headers":req['headers']}
                     debug(f"captured api url: {req['url']}")
             if driver.current_url != path and driver.current_url not in VisitedUrl:
                 new_url = driver.current_url.rstrip("/")
@@ -328,6 +337,8 @@ def Save():
         BuildUrlToNode()
         with open(abs_path, 'w', encoding='utf-8') as f:
             json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
+        with open("TestApis.json", 'w', encoding='utf-8') as f:
+            json.dump(PathsApi, f, ensure_ascii=False, indent=2)
         print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}Save failed: {e}{Style.RESET_ALL}")

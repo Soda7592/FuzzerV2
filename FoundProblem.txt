@@ -82,5 +82,26 @@
 - 把 API 的部分用之前的 AnalyseInput 和 Requests_handler 整理好再匯入 Json
     - 目前是 BFS 的方式，如果中途突然 get 出去抓 forms 的資訊可能導致邏輯出錯，到時候 bug 會修不完
     - 應該要嘗試如何把抓 API 的動作混合進目前的業務流程中。
+    - 為了方便直接透過 url 檢索，結構應該要是這樣
+    {
+        url1 :{
+            apiurl1: {
+                'body':body.text,
+                'method':method,
+                'headers':headers
+            },
+            apiurl2: {
+                ...
+            }
+        }
+    }
     1. 先 init requests_handler, 給他 cookies/session 
     2. 我需要 AllTags, body_text, method, headers, url, 
+    - 要插入 Payload 的產生邏輯要寫在 BuildData，那邊非常快速可以寫完
+
+    -> 目前可以產收 API json，但是會有一些奇怪的情況，例如 req.body 是有東西的，但是進行 BuildData 時偵測 forms 卻偵測不到
+        - 有可能那個頁面就是沒有 forms?
+            -  有可能，例如 administrator 頁面一堆按鈕可以 POST 但自己本身沒有 forms
+    - 目前 API 樹應該堪用了，但有疑問要解決
+        - administrator 這邊真的沒有半個 API 需要紀錄?
+        - 可能要跑看看 50 - 100 個結果再來確定是否正確

@@ -21,7 +21,9 @@ def GetInputInfo(all_bs_tags):
     forms = [tag for tag in all_bs_tags if tag.name == 'form']
 
     if not forms:
+        # print(all_bs_tags)
         print(f"{Fore.YELLOW}頁面中未偵測到 <form> 標籤。{Style.RESET_ALL}")
+        return None
     
     for form_tag in forms:
         form_action = form_tag.get('action', '')
@@ -81,6 +83,8 @@ def BuildData(AllTags, url, body_str) :
     data = ParseBody(body_str)
     InputInfo = {}
     InputInfo[url] = GetInputInfo(AllTags)
+    if InputInfo[url] is None:
+        return None, None
     method = InputInfo[url][0]['method']
     NonEmpty_fields = {}
     for tag in InputInfo[url][0]['fields']:
