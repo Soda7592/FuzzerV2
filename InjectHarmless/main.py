@@ -44,7 +44,21 @@ if __name__ == "__main__":
     RequestHandler = ApiSessionHandler(LoginSession["Cookies"])
     Apis = GetApis()
     for key in Apis.keys():
-        print(Apis[key])
+        for key_ in Apis[key].keys():
+            if Apis[key][key_] != {}:
+                Headers = Apis[key][key_]["headers"]
+                Body = Apis[key][key_]["body"]
+                if type(Body) == dict:
+                    for k in Body.keys() :
+                        if Body[k] == "Fuzzable":
+                            Body[k] = "aaa1234"
+                response = RequestHandler.SendApiRequest(Apis[key][key_]["method"], key, Headers, Body)
+                if response:
+                    print(f"{Fore.GREEN}API 請求成功！回傳內容: {response.status_code}{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.RED}API 請求失敗，請檢查日誌。{Style.RESET_ALL}")
+
+
     # print(response.text)
     # AddExcludeKeywords(["login", "logout", "install", "installer", "plugin"])
     # print(GetExcludeKeywords())
