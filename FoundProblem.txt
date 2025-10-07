@@ -131,5 +131,9 @@
 -> 有時候沒辦法登入有時候可以，本來以為是 headers 的問題，後來發現 headers 隨便抓到 google 的也能登入，表示跟 headers 無關。我猜是 Session 有沒有過期導致的。
     -> 修改 System 那邊的 Session lifetime
 
+************
 當務之急是先讓 Requests 能夠正常發出，先嘗試自動化使用 submit-an-article
     -> submit-an-article 那個的 api 裡面要是 task.save 才能順利發出文章
+        -> 但是 task.save 的 apis 有包含在我的 apis 清單裡面，理論上不用修改其他內容
+        -> 原本發現 Fuzzable 不能正確標上去，現在標上去了。
+        -> 目前的版本可以從 Crawler 接到 Apis.json 後透過 requests 成功送出請求
