@@ -15,6 +15,9 @@ import requests
 import datetime
 import json
 import os
+import atexit
+import signal
+import sys
 
 UrlQueue = []
 VisitedUrl = []
@@ -29,48 +32,12 @@ VERBOSE = False
 
 # 進度統計與上限
 ProcessedCount = 0
-MAX_PROCESSED = 230
+MAX_PROCESSED = 10
 
 def debug(message):
     if VERBOSE:
         print(message)
 
-# 以 URL 為鍵的樹狀圖：即時維護節點與邊，以及節點上的 APIs
-CrawlerTree = {}
-
-def ensure_node(url):
-    if url is None:
-        return
-    if url not in CrawlerTree:
-        CrawlerTree[url] = {"apis": [], "children": []}
-
-def add_edge(parent_url, child_url):
-    if parent_url is None or child_url is None:
-        return
-    ensure_node(parent_url)
-    ensure_node(child_url)
-    if child_url not in CrawlerTree[parent_url]["children"]:
-        CrawlerTree[parent_url]["children"].append(child_url)
-
-def add_api_to_node(url, api_info):
-    ensure_node(url)
-    # 再次保險：正規化 headers 與 body，避免非可序列化型別
-    normalized = dict(api_info)
-    headers_val = normalized.get("headers")
-    if isinstance(headers_val, dict):
-        normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
-    else:
-        try:
-            normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
-        except Exception:
-            normalized["headers"] = str(headers_val)
-    body_val = normalized.get("body")
-    if isinstance(body_val, (bytes, bytearray)):
-        try:
-            normalized["body"] = body_val.decode("utf-8", errors="ignore")
-        except Exception:
-            normalized["body"] = str(body_val)
-    CrawlerTree[url]["apis"].append(normalized)
 
 # ---- Mitmproxy ----
 # MitmProxyHost = "127.0.0.1"
@@ -176,12 +143,11 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
                 for req in captured:
                     # print("captured: ", req)
                     PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
-                    add_api_to_node(path, req)
                     debug(f"captured api url: {req['url']}")
             if driver.current_url != path and driver.current_url not in VisitedUrl:
                 UrlQueue.append(driver.current_url)
                 VisitedUrl.append(driver.current_url)
-                add_edge(path, driver.current_url)
+                print(VisitedUrl)
                 debug(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {driver.current_url} {Style.RESET_ALL}")
 
 def UrlInit(RootUrl):
@@ -193,7 +159,7 @@ def UrlInit(RootUrl):
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.get(RootUrl)
-        VisitedUrl.append(GetUrlPath(RootUrl, GetDomainName(RootUrl)))
+        VisitedUrl.append(RootUrl)
         # FullHTML = driver.page_source
         time.sleep(2)
         username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "modlgn-username")))
@@ -209,8 +175,6 @@ def UrlInit(RootUrl):
         print(f"{Fore.GREEN}Login Success{Style.RESET_ALL}")
         debug(f"{Fore.RED}Waiting for 2 seconds for website fully render.{Style.RESET_ALL}")
         time.sleep(2)
-        # 初始化樹的根節點（以目前 URL 作為根）
-        ensure_node(driver.current_url)
         return driver
     except Exception as e:
         print(f"Error: {e}")
@@ -296,7 +260,7 @@ def GetStaticUrl(driver, AllTags, RootUrl):
                         UrlQueue.append(url)
                         PathsPath[path].append(t)
                         VisitedUrl.append(url)
-                        add_edge(path, url)
+                        print(VisitedUrl)
             # if t != None and t[0] != "/" and t[0] != "#":
             #     t = GetUrlPath(path + t, RootDomain)
             # if t not in VisitedUrl and t != None: 
@@ -324,7 +288,7 @@ def GetStaticUrl(driver, AllTags, RootUrl):
                         UrlQueue.append(url)
                         PathsPath[path].append(t)
                         VisitedUrl.append(url)
-                        add_edge(path, url)
+                        print(VisitedUrl)
     #         if t != None and t[0] != "/" and t[0] != "#":
     #             t = GetUrlPath(path + t, RootDomain)
     #         if t not in VisitedUrl and t != None:
@@ -361,7 +325,7 @@ def GetNext(driver, RootUrl, url):
     GetPotentialInteractive(driver, RootUrl, AllTags)
     if ProcessedCount >= MAX_PROCESSED:
         print(f"{Fore.YELLOW}Reached limit {MAX_PROCESSED}, saving and exiting...{Style.RESET_ALL}")
-        Save()
+        safe_save()
         raise SystemExit(0)
 
 def GetTime():
@@ -369,45 +333,38 @@ def GetTime():
     filename = now.strftime("%Y_%m_%d_%H") + ".json"
     return filename
 
-def build_nested_tree(root_url):
-    ensure_node(root_url)
-    return {
-        "url": root_url,
-        "apis": CrawlerTree[root_url]["apis"],
-        "children": [build_nested_tree(child) for child in CrawlerTree[root_url]["children"]]
-    }
+def Save(filename, Paths, Apis): 
+    filename = GetTime()
+    CrawlerData = {}
+    for url in Paths:
+        if url not in CrawlerData:
+            CrawlerData[url] = {"apis":[], "paths":[], "children":[]}
+        
+    for api in Apis:
+        CrawlerData[api] = api
+    with open(filename, 'w', encoding='utf-8') as f:
+        pass
 
-def _infer_root_url():
-    # 推導沒有被任何人當作 child 的節點作為根
-    all_nodes = set(CrawlerTree.keys())
-    all_children = set()
-    for node in CrawlerTree.values():
-        for child in node["children"]:
-            all_children.add(child)
-    candidates = list(all_nodes - all_children)
-    if candidates:
-        return candidates[0]
-    return next(iter(all_nodes), None)
+# 安全儲存函式，用於訊號處理
+def safe_save():
+    try:
+        Save(VisitedUrl, TotalApi)
+    except Exception as e:
+        print(f"{Fore.RED}Safe save failed: {e}{Style.RESET_ALL}")
 
-def Save(root_url=None, filename=None): 
-    if filename is None:
-        filename = GetTime()
-    if root_url is None:
-        # 優先用樹來推導根，其次才嘗試用 VisitedUrl[0]
-        root_url = _infer_root_url()
-        if root_url is None and len(VisitedUrl) > 0:
-            root_url = VisitedUrl[0]
-    if root_url is None:
-        print(f"{Fore.RED}No root URL available to save tree.{Style.RESET_ALL}")
-        return
-    tree = build_nested_tree(root_url)
-    abs_path = os.path.abspath(filename)
-    with open(abs_path, 'w', encoding='utf-8') as f:
-        json.dump(tree, f, ensure_ascii=False, indent=2)
-    print(f"{Fore.GREEN}Saved tree to {abs_path}{Style.RESET_ALL}")
+# 訊號處理函式
+def handle_interrupt(sig, frame):
+    print(f"\n{Fore.YELLOW}Received interrupt signal, saving data...{Style.RESET_ALL}")
+    safe_save()
+    sys.exit(0)
 
 
 def main(RootUrl, LoginUrl):
+    # 註冊訊號處理與退出保護
+    signal.signal(signal.SIGINT, handle_interrupt)   # Ctrl+C
+    signal.signal(signal.SIGTERM, handle_interrupt)  # 終止信號
+    atexit.register(safe_save)  # 程式正常結束時也會儲存
+    
     # MitmProcess = None
     driver = None
     try:
@@ -431,9 +388,7 @@ def main(RootUrl, LoginUrl):
             print(f"{Fore.GREEN}Driver closed.{Style.RESET_ALL}")
         # if MitmProcess:
         #     StopMitmProxy(MitmProcess)
-        # 無論是否出錯皆嘗試儲存樹狀圖
-        Save()
-        # 目前 Session 會過期，然後看能不能弄成 Ctrl C 之後一定會有東西寫入 json
+        # 儲存由 atexit 和訊號處理負責，這裡不需要重複呼叫
 
 
     # print("\n\nPathsAPIs:")

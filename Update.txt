@@ -28,3 +28,7 @@
 Header 呢? 在 mainRequests.py 裡面的 headers 是不是每次都要生成一個最適合的? 25/08/28
 -> 找到了在 ClickByXpath 中，可以抓到 headers, 這邊連 method, body 都有 感覺程式碼還需要改
 -> 但我還沒執行過 mainSeleniumWire.py, 所以不確定對或錯，需要執行下去確認 PathsApi 內部長甚麼樣才能把整個流程接起來。
+
+
+## 25/10/05
+-> 目前考慮把 Requests 和 Selenium 模組分開來進行，爬蟲執行完後要把狀態交給 Requests 所以要把 Cookies Export 出來

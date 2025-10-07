@@ -10,7 +10,7 @@ class ApiSessionHandler:
         self.session = requests.Session()
         self.session_cookies = {c['name']: c['value'] for c in cookies}
         self.session.cookies.update(self.session_cookies)
-        print(f"{Fore.GREEN}ApiSessionHandler 已初始化，並載入 {len(self.session.cookies)} 個 Cookies。{Style.RESET_ALL}")
+        # print(f"{Fore.GREEN}ApiSessionHandler 已初始化，並載入 {len(self.session.cookies)} 個 Cookies。{Style.RESET_ALL}")
     
     def GetAllTagsFromRequest(self, url):
         response = self.session.get(url)

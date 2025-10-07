@@ -1,7 +1,8 @@
 from bs4 import BeautifulSoup
 from colorama import Fore, Style, init
 import json
-from ParseArg import ParseBody
+from .ParseArg import ParseBody
+from urllib.parse import urljoin, urlparse
 
 def GetSelectOptions(select_tag):
     options_list = []
@@ -81,22 +82,47 @@ def GetInputInfo(all_bs_tags):
 
 def BuildData(AllTags, url, body_str) :
     data = ParseBody(body_str)
+    protocol = urlparse(url).scheme
+    domain = urlparse(url).netloc
+    preurl = protocol + "://" + domain
     InputInfo = {}
     InputInfo[url] = GetInputInfo(AllTags)
     if InputInfo[url] is None:
         return None, None
     method = InputInfo[url][0]['method']
     NonEmpty_fields = {}
-    for tag in InputInfo[url][0]['fields']:
+    # print(url)
+    # for tag in InputInfo[url]:
+    #     print(tag)
+    target = None
+    for tag in InputInfo[url]:
+        act = tag['action']
+        if urljoin(preurl, act) == url:
+            target = tag
+            break
+    if target is None:
+        return None, None
+    # print(url)
+    # print(target['fields'])
+    for tag in target['fields']: # in InputInfo[url][0]['fields']:
         if tag['required'] == True:
             NonEmpty_fields[tag['name']] = tag
         elif tag['type'] == 'text' or tag['type'] == 'textarea' :
             NonEmpty_fields[tag['name']] = tag
+    
+    # print(NonEmpty_fields)
+
     for key, value in NonEmpty_fields.items():
+        # print(value)
         if value['type'] == "text":
-            data[key] = "test"
+            data[key] = "Fuzzable"
+            # print(key)
         elif value['type'] == "textarea":
-            data[key] = "test"
+            data[key] = "Fuzzable"
         elif value['type'] == "select":
             data[key] = value['options'][0]
+    
+    # for key, value in data.items():
+    #     print(key, value)
+
     return data, method

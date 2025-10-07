@@ -1,3 +1,5 @@
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -17,9 +19,9 @@ import atexit
 import signal
 import sys
 from collections import deque
-from requests_handler import ApiSessionHandler
-from ParseArg import ParseBody
-from AnalyseInput import BuildData
+from modules.requests_handler import ApiSessionHandler
+from modules.ParseArg import ParseBody
+from modules.AnalyseInput import BuildData
 
 UrlQueue = []
 VisitedUrl = set()
@@ -33,13 +35,13 @@ TotalApi = set()
 PathsPath = {}
 ProxyHost = "http://127.0.0.1"
 ProxyPort = 8080
-EXCLUDE_KEYWORDS = {"logout", "install", "installer", "plugin"}
+EXCLUDE_KEYWORDS = {"login","logout", "install", "installer", "plugin"}
 # 控制是否顯示詳細除錯資訊
 VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 20
+MAX_PROCESSED = 15
 RootStartUrl = None
 
 # 取消樹狀圖資料結構，採線性紀錄
@@ -47,39 +49,6 @@ RootStartUrl = None
 def debug(message):
     if VERBOSE:
         print(message)
-
-# def ensure_node(url):
-#     if url is None:
-#         return
-#     if url not in CrawlerTree:
-#         CrawlerTree[url] = {"apis": [], "children": []}
-
-# def add_edge(parent_url, child_url):
-#     if parent_url is None or child_url is None:
-#         return
-#     ensure_node(parent_url)
-#     ensure_node(child_url)
-#     if child_url not in CrawlerTree[parent_url]["children"]:
-#         CrawlerTree[parent_url]["children"].append(child_url)
-
-# def add_api_to_node(url, api_info):
-#     ensure_node(url)
-#     normalized = dict(api_info)
-#     headers_val = normalized.get("headers")
-#     if isinstance(headers_val, dict):
-#         normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
-#     else:
-#         try:
-#             normalized["headers"] = {str(k): str(v) for k, v in headers_val.items()}
-#         except Exception:
-#             normalized["headers"] = str(headers_val)
-#     body_val = normalized.get("body")
-#     if isinstance(body_val, (bytes, bytearray)):
-#         try:
-#             normalized["body"] = body_val.decode("utf-8", errors="ignore")
-#         except Exception:
-#             normalized["body"] = str(body_val)
-#     CrawlerTree[url]["apis"].append(normalized)
 
 def GetLoginSession(driver, LoginUrl):
     driver.get(LoginUrl)
@@ -171,6 +140,8 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
             if captured is not None:
                 for req in captured:
                     data, method = BuildData(AllTags, req['url'], req['body'])
+                    print(data)
+                    # print(req['url'])
                     if data is None:
                         if req['method'] == 'POST' and req['body'] != '':
                             PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
@@ -208,7 +179,6 @@ def UrlInit(RootUrl):
         time.sleep(2)
         print(f"{Fore.GREEN}Login Success{Style.RESET_ALL}")
         print(f"{Fore.RED}Waiting for 2 seconds for website fully render.{Style.RESET_ALL}")
-
         return driver
     except Exception as e:
         print(f"Error: {e}")
@@ -305,14 +275,27 @@ def PrintUrlQueue(UrlQueue):
     for url in UrlQueue:
         print(url)
 
+def CheckStatusCode(url, requests):
+    requests = reversed(requests)
+    main_req = None
+    for req in requests:
+        if req.url == url:
+            # print(req.url)
+            return req.response.status_code
+    return None
+
 def GetNext(driver, RootUrl, url):
+    driver.get(url)
+    time.sleep(2)
+    status_code = CheckStatusCode(url, driver.requests)
+    if status_code >= 400 and status_code <= 499:
+        VisitedUrl.add(url)
+        return
+    print(status_code)
     global ProcessedCount
     ProcessedCount += 1
     pending = max(len(UrlQueue) - ProcessedCount, 0)
     print(f"{Fore.GREEN}Processing (done/pending) {ProcessedCount}/{pending}: {Style.RESET_ALL}  {Fore.RED}{url}{Style.RESET_ALL}")
-    # 線性處理，不建樹
-    driver.get(url)
-    time.sleep(3)
     AllTags = GetAllTags(driver)
     GetStaticUrl(driver, AllTags, url)
     GetPotentialInteractive(driver, RootUrl, AllTags)
@@ -327,17 +310,17 @@ def GetNext(driver, RootUrl, url):
 
 def GetTime():
     now = datetime.datetime.now()
-    filename = now.strftime("%Y_%m_%d_%H") + ".json"
+    filename = now.strftime("%Y_%m_%d_%H")
     return filename
 
 def Save():
     try:
         filename = GetTime()
-        abs_path = os.path.abspath(filename)
+        abs_path = os.path.abspath("../ResourcesPool/" + filename) + ".json"
         BuildUrlToNode()
         with open(abs_path, 'w', encoding='utf-8') as f:
             json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
-        with open("TestApis.json", 'w', encoding='utf-8') as f:
+        with open(f"../ResourcesPool/Apis.json", 'w', encoding='utf-8') as f:
             json.dump(PathsApi, f, ensure_ascii=False, indent=2)
         print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
     except Exception as e:
@@ -354,6 +337,20 @@ def handle_interrupt(sig, frame):
     print(f"\n{Fore.YELLOW}Received interrupt signal, saving data...{Style.RESET_ALL}")
     safe_save()
     sys.exit(0)
+
+def ExportLoginSession(driver):
+    requests = driver.requests
+    Cookies = driver.get_cookies()
+    Headers = dict(requests[0].headers)
+    UserAgent = Headers.get("User-Agent")
+    LoginSession = {
+        "Cookies": Cookies,
+        "Headers": Headers,
+        "UserAgent": UserAgent
+    }
+    with open(f"../ResourcesPool/LoginSession.json", "w") as f:
+        json.dump(LoginSession, f)
+    return LoginSession
 
 def TestPrentMap():
     for url in ParentMap:
@@ -380,6 +377,7 @@ def main(RootUrl, LoginUrl):
     try:
         driver = UrlInit(RootUrl)
         GetLoginSession(driver, LoginUrl)
+        ExportLoginSession(driver)
         GetNext(driver, RootUrl, RootUrl)
         i = 0
         while i < len(UrlQueue):

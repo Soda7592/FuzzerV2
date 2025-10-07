@@ -105,3 +105,31 @@
     - 目前 API 樹應該堪用了，但有疑問要解決
         - administrator 這邊真的沒有半個 API 需要紀錄?
         - 可能要跑看看 50 - 100 個結果再來確定是否正確
+
+## 25/09/16
+- 有沒有可能用 multithreads 加速?
+    -> 有，但非常困難，因為原先使用 BFS，然後在 BFS 的特性中內涵樹狀結構的階層順序。如果改以 multithreads 
+    可能會影響這個順序進而導致建樹階段出現錯誤。
+    -> Python 內建的 queue.Queue 好像是 thread-safe，內建 lock 可以解決 multithreads 的問題
+
+## 25/10/05
+-> 目前考慮把 Requests 和 Selenium 模組分開來進行，爬蟲執行完後要把狀態交給 Requests 所以要把 Cookies Export 出來
+    -> Load Successfully
+-> 現在要測試注入無害的 requests，應該要忽略 login/logout
+-? 如果有 404 的頁面是不是不要紀錄比較好 ?
+
+## 25/10/07
+-> 目前 Apis 清單內會抓到 login，這個應該要處理掉
+-> Apis 清單內有一堆是空的，我猜是 not found 頁面很多是 POST，但是實際去看頁面後卻甚麼都抓不到，導致 apis.json 抓到很多空值
+    -> 要把這些空值過濾掉 不然能使用的 Apis 太少
+-> 目前有很多頁面是 not found 的，要看情況弄掉
+    -> driver 可以吃到 status code 了，也不會記錄在 process 裡面，但是 Json 還是會記錄到，可能要思考一下這樣是好還是不好
+-> 發現新問題！！！！，如果執行過某個API後才新增網頁呢? 那這個網頁要怎麼確認?
+    -> 目前 Submit an article 後就會出現新的頁面在外面
+-> Fuzzable 有的時候能正常記錄在 Apis.json, 但有時候又不行，不確定為何
+
+-> 有時候沒辦法登入有時候可以，本來以為是 headers 的問題，後來發現 headers 隨便抓到 google 的也能登入，表示跟 headers 無關。我猜是 Session 有沒有過期導致的。
+    -> 修改 System 那邊的 Session lifetime
+
+當務之急是先讓 Requests 能夠正常發出，先嘗試自動化使用 submit-an-article
+    -> submit-an-article 那個的 api 裡面要是 task.save 才能順利發出文章
