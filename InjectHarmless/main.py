@@ -15,7 +15,7 @@ def GetLoginSession():
         return json.load(f)
 
 def GetApis():
-    apis = open(ResourcesPool + "Apis.json", "r", encoding="utf-8").read()
+    apis = open(ResourcesPool + "apis.json", "r", encoding="utf-8").read()
     return json.loads(apis)
 
 def GetUrlInfo(url):
@@ -42,6 +42,7 @@ if __name__ == "__main__":
     LoginSession = GetLoginSession()
     # print(LoginSession["Headers"])
     RequestHandler = ApiSessionHandler(LoginSession["Cookies"])
+    FuzzableCount = 1
     Apis = GetApis()
     for key in Apis.keys():
         for key_ in Apis[key].keys():
@@ -51,13 +52,16 @@ if __name__ == "__main__":
                 if type(Body) == dict:
                     for k in Body.keys() :
                         if Body[k] == "Fuzzable":
-                            Body[k] = "aaa1234"
+                            FuzzableCount += 1
+                            Body[k] += str(FuzzableCount)
                 response = RequestHandler.SendApiRequest(Apis[key][key_]["method"], key, Headers, Body)
                 if response:
                     print(f"{Fore.GREEN}API 請求成功！回傳內容: {response.status_code}{Style.RESET_ALL}")
                 else:
                     print(f"{Fore.RED}API 請求失敗，請檢查日誌。{Style.RESET_ALL}")
-
+    # 目前這邊可以自動執行 requests，並且可以順利修改到網頁內容
+    # 例如把 Fuzzable 改成 aaa1234 後可以在網頁上的文章中確實看到真的有一篇 aaa1234 的文章
+    # 可以用更多筆的測試資料來測試 然後就要確認一下要如何注入高辨識度的資料
 
     # print(response.text)
     # AddExcludeKeywords(["login", "logout", "install", "installer", "plugin"])
