@@ -137,3 +137,31 @@
         -> 但是 task.save 的 apis 有包含在我的 apis 清單裡面，理論上不用修改其他內容
         -> 原本發現 Fuzzable 不能正確標上去，現在標上去了。
         -> 目前的版本可以從 Crawler 接到 Apis.json 後透過 requests 成功送出請求
+
+## 25/10/08
+
+目前發現執行爬蟲後為了檢測 status code，導致部分 requests 無法正常地被 driver.get 捕捉到(因為僅用弱的 time.sleep())
+這樣會讓一些網頁檢測不到 driver.requests 進而出現錯誤。
+-> 不對啊完蛋，我發現 404 的頁面出來的原因應該是因為 urljoin 出錯，/administrator/index.php 的頁面的 href 直接合併到了 /index.php 後面了
+```
+path:  http://192.168.11.129:8080/administrator/index.php
+t:  index.php?option=com_joomlaupdate
+url: http://192.168.11.129:8080/index.php?option=com_joomlaupdate
+path:  http://192.168.11.129:8080/administrator/index.php
+t:  index.php?option=com_joomlaupdate
+url: http://192.168.11.129:8080/index.php?option=com_joomlaupdate
+```
+joomla 在搞= =
+-> 目前是當作 Joomla 的 Special case 處理，如果未來延伸到要用到其他系統上要注意，邏輯寫在 GetMergeUrl 處
+
+Processing (done/pending) 121/182:   http://192.168.11.129:8080/administrator/index.php?option=com_users&view=debuggroup&group_id=6
+[9716:15964:1008/141347.490:ERROR:ui\latency\latency_info.cc:112] CompositorFrameSinkSupport::MaybeSubmitCompositorFrame, LatencyInfo vector size 667 is too big.
+
+目前在 Processing 到 121 時會沒辦法 saving，就嘗試用 118 吧
+在 118 的時候會有一個很詭異的錯誤
+Reached limit 118, saving and exiting...
+Driver closed.
+Save failed: 'http://192.168.11.129:8080/administrator/index.php?option=com_admin&view=profile&layout=edit&id=255'
+
+-> 在 50 筆的時候有部分 body 的解碼錯了QQ
+    -> 好像是因為 GetNext 太快了，我改回 time.sleep(3) 就正常回來了
