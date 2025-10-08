@@ -41,7 +41,7 @@ VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 15
+MAX_PROCESSED = 118
 RootStartUrl = None
 
 # 取消樹狀圖資料結構，採線性紀錄
@@ -140,12 +140,12 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
             if captured is not None:
                 for req in captured:
                     data, method = BuildData(AllTags, req['url'], req['body'])
-                    print(data)
+                    # print(data)
                     # print(req['url'])
                     if data is None:
                         if req['method'] == 'POST' and req['body'] != '':
                             PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
-                            print(f"{{path: {path}, url: {req['url']}}} Missing forms, but POST with body")
+                            # print(f"{{path: {path}, url: {req['url']}}} Missing forms, but POST with body")
                         # print(f"{Fore.RED}Data is None for {req['body']}{Style.RESET_ALL}")
                         pass
                     else:
@@ -219,6 +219,12 @@ def GetUrlPath(url, RootDomain):
         return url
 
 def GetMergeUrl(current, path):
+    # Joomla 的特定解析格式
+    # 如果 current 是 /administrator/index.php 且 path 是 index.php 開頭，那合併就會出錯
+    # 如果 current 是 /administrator 且 path 是 /index.php，那合併就會出錯
+    # 再多找找幾種情況
+    if current.endswith("/administrator") and path.startswith("index.php"):
+        return current + "/" + path
     return urljoin(current, path)
 
 def should_exclude_url(url):
@@ -240,6 +246,7 @@ def IsHttpUrl(url):
 def GetStaticUrl(driver, AllTags, RootUrl):
     RootDomain = GetDomainName(RootUrl)
     path = driver.current_url.rstrip("/")
+    # print("path1: ", path)
     if path not in PathsPath:
         PathsPath[path] = []
     for tag in AllTags:
@@ -249,7 +256,12 @@ def GetStaticUrl(driver, AllTags, RootUrl):
                 continue
             t = GetUrlPath(href_val, RootDomain)
             if t and t[0] != "#":
+                # if t[0] != "/":
+                #     t = "/" + t
+                # print("path: ", path)
+                # print("t: ", t)
                 url = GetMergeUrl(path, t).rstrip("/")
+                #print(f"{Fore.RED}url: {url}{Style.RESET_ALL}")
                 if url not in VisitedUrl and url and not should_exclude_url(url) and IsHttpUrl(url):
                     debug(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {url} {Style.RESET_ALL}")
                     UrlQueue.append(url)
@@ -262,7 +274,12 @@ def GetStaticUrl(driver, AllTags, RootUrl):
                 continue
             t = GetUrlPath(href_val, RootDomain)
             if t and t[0] != "#":
+                # if t[0] != "/":
+                #     t = "/" + t
+                # print("path: ", path)
+                # print("t: ", t)
                 url = GetMergeUrl(path, t).rstrip("/")
+                # print(f"{Fore.RED}url: {url}{Style.RESET_ALL}")
                 if url not in VisitedUrl and url and not should_exclude_url(url) and IsHttpUrl(url):
                     debug(f"{Fore.RED}Find New Url! {Fore.YELLOW} Append visited url: {Fore.RED} {url} {Style.RESET_ALL}")
                     UrlQueue.append(url)
@@ -277,35 +294,31 @@ def PrintUrlQueue(UrlQueue):
 
 def CheckStatusCode(url, requests):
     requests = reversed(requests)
-    main_req = None
     for req in requests:
         if req.url == url:
             # print(req.url)
             return req.response.status_code
-    return None
+    return 0
 
 def GetNext(driver, RootUrl, url):
     driver.get(url)
-    time.sleep(2)
+    time.sleep(3)
     status_code = CheckStatusCode(url, driver.requests)
+    # status_code = CheckStatusCode(url, driver.requests)
     if status_code >= 400 and status_code <= 499:
         VisitedUrl.add(url)
         return
-    print(status_code)
+    AllTags = GetAllTags(driver)
+    GetStaticUrl(driver, AllTags, url)
+    GetPotentialInteractive(driver, RootUrl, AllTags)
+    # print(status_code)
     global ProcessedCount
     ProcessedCount += 1
     pending = max(len(UrlQueue) - ProcessedCount, 0)
     print(f"{Fore.GREEN}Processing (done/pending) {ProcessedCount}/{pending}: {Style.RESET_ALL}  {Fore.RED}{url}{Style.RESET_ALL}")
-    AllTags = GetAllTags(driver)
-    GetStaticUrl(driver, AllTags, url)
-    GetPotentialInteractive(driver, RootUrl, AllTags)
 
-    # if ProcessedCount % 50 == 0:
-    #     print(f"{Fore.YELLOW}Periodic save at {ProcessedCount}{Style.RESET_ALL}")
-    #     Save(root_url=RootStartUrl, filename=GetTime())
     if ProcessedCount >= MAX_PROCESSED:
         print(f"{Fore.YELLOW}Reached limit {MAX_PROCESSED}, saving and exiting...{Style.RESET_ALL}")
-        # Save(root_url=RootStartUrl)
         raise SystemExit(0)
 
 def GetTime():
@@ -318,6 +331,7 @@ def Save():
         filename = GetTime()
         abs_path = os.path.abspath("../ResourcesPool/" + filename) + ".json"
         BuildUrlToNode()
+        print(f"{Fore.GREEN}UrlToNode: {UrlToNode['http://192.168.11.129:8080/index.php']}{Style.RESET_ALL}")
         with open(abs_path, 'w', encoding='utf-8') as f:
             json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
         with open(f"../ResourcesPool/Apis.json", 'w', encoding='utf-8') as f:
