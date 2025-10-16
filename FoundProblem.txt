@@ -165,3 +165,39 @@ Save failed: 'http://192.168.11.129:8080/administrator/index.php?option=com_admi
 
 -> 在 50 筆的時候有部分 body 的解碼錯了QQ
     -> 好像是因為 GetNext 太快了，我改回 time.sleep(3) 就正常回來了
+
+## 25/10/15
+
+118 還是怪怪的 Save failed: 'http://192.168.11.129:8080/administrator/index.php?option=com_admin&view=profile&layout=edit&id=759'
+不知道是甚麼問題，改決可以只瀏覽這個網頁看看? 之後再來修這個問題
+
+今天先來想無害字串
+1. 要能夠盡可能快速的對應出在 API Tree 的哪個位子，以及哪個欄位
+    -> url & form field 
+2. 如果用 Hash 又會需要另外存一個 map (耗空間，但或許是最後的方案)
+3. 使用 base64 編碼 url + field (url 部份去掉 scheme 和 domain)
+    -> (本身屬於無損編碼，但會讓整體的長度拉長許多，如果 url 還有帶 token 可能會導致長度過長)
+    -> (但是 base64 字元不包含 ><'"&%* 這類可能觸發防火牆或其他錯誤的符號，這會大幅度的加快注入工作，也能直接還原不需要 map)
+    -> 唯一擔心的是長度限制
+
+-> MTSEC_Hash_FieldID
+    -> MTSEC 是可辨識的前綴
+    -
+    > Hash 可以用來快速定位至樹上的某個 node，但是具體要用多長的 Hash 需要考慮一下
+        -> 記錄前 8 位 hash 值或是更多?
+        -> 目前可能可以先針對整陀 url 進行 Hash 然後用這個 url 結果
+            -> 不過這樣會有很嚴重的泛用性問題
+                -> 光是在爬蟲搜尋的途中 就可能因為大量的相似網站導致耗時過長，因為同樣頁面會有一樣問題才對
+                -> 過大的狀態也會加深遇到碰撞的機率
+                    -> 如果只取 8 位，則可能在 65536 筆時出現 50% 的碰撞機率 (md5)
+                    -> 12 位的話是 1670萬筆資料才可能會有 50% 的碰撞機率(md5)
+        -> 注入時只取前面 8 or 12 位，但是存入 json 內存完整的 hash，
+            -> 那是不是該儲存成 list 而非 dict 呢  
+                -> 但是 List 查找平均情況是 O(n)
+    
+    -> FieldID 的部分也要用方便辨識的字串，首先假設注入 body list 如下
+        -> jform[title]:
+        -> jform[task]:
+        -> jform[...]:
+        那就依序從上到下，title 為第一個, task 為第二個以此類推。
+        然後也要使用好辨識字串，例如 Hash_Fidm01 是 title，這樣就可以快速 mapping 到每一個 input field 
