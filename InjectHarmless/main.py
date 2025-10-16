@@ -6,6 +6,7 @@ import requests
 from modules.requests_handler import ApiSessionHandler
 from modules.ParseArg import ParseBody
 from modules.AnalyseInput import BuildData
+from hashlib import sha1
 
 ResourcesPool = "../ResourcesPool/"
 ExcludeKeywords = []
@@ -44,21 +45,26 @@ if __name__ == "__main__":
     RequestHandler = ApiSessionHandler(LoginSession["Cookies"])
     FuzzableCount = 1
     Apis = GetApis()
+    print(Apis)
     for key in Apis.keys():
         for key_ in Apis[key].keys():
             if Apis[key][key_] != {}:
                 Headers = Apis[key][key_]["headers"]
                 Body = Apis[key][key_]["body"]
                 if type(Body) == dict:
+                    count = 0
                     for k in Body.keys() :
                         if Body[k] == "Fuzzable":
-                            FuzzableCount += 1
-                            Body[k] += str(FuzzableCount)
+                            sha1_hash = str(sha1(key.encode()).hexdigest())[:8]
+                            Body[k] += "MTSEC-" + sha1_hash + "-" + str("Fform" + str(count))
+                            count += 1
+                            print(Body[k])
                 response = RequestHandler.SendApiRequest(Apis[key][key_]["method"], key, Headers, Body)
                 if response:
                     print(f"{Fore.GREEN}API 請求成功！回傳內容: {response.status_code}{Style.RESET_ALL}")
                 else:
                     print(f"{Fore.RED}API 請求失敗，請檢查日誌。{Style.RESET_ALL}")
+
     # 目前這邊可以自動執行 requests，並且可以順利修改到網頁內容
     # 例如把 Fuzzable 改成 aaa1234 後可以在網頁上的文章中確實看到真的有一篇 aaa1234 的文章
     # 可以用更多筆的測試資料來測試 然後就要確認一下要如何注入高辨識度的資料
