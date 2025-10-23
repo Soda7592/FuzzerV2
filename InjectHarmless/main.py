@@ -16,7 +16,7 @@ def GetLoginSession():
         return json.load(f)
 
 def GetApis():
-    apis = open(ResourcesPool + "apis.json", "r", encoding="utf-8").read()
+    apis = open(ResourcesPool + "Apis.json", "r", encoding="utf-8").read()
     return json.loads(apis)
 
 def GetUrlInfo(url):
@@ -55,10 +55,10 @@ if __name__ == "__main__":
                     count = 0
                     for k in Body.keys() :
                         if Body[k] == "Fuzzable":
-                            sha1_hash = str(sha1(key.encode()).hexdigest())[:8]
-                            Body[k] += "MTSEC-" + sha1_hash + "-" + str("Fform" + str(count))
+                            sha1_hash = str(sha1(key.encode()).hexdigest())[:12]
+                            Body[k] = "MTSEC-" + sha1_hash + "-" + str("F" + str(count))
                             count += 1
-                            print(Body[k])
+                            # print(Body[k])
                 response = RequestHandler.SendApiRequest(Apis[key][key_]["method"], key, Headers, Body)
                 if response:
                     print(f"{Fore.GREEN}API 請求成功！回傳內容: {response.status_code}{Style.RESET_ALL}")
