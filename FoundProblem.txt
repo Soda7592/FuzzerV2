@@ -201,3 +201,34 @@ Save failed: 'http://192.168.11.129:8080/administrator/index.php?option=com_admi
         -> jform[...]:
         那就依序從上到下，title 為第一個, task 為第二個以此類推。
         然後也要使用好辨識字串，例如 Hash_Fidm01 是 title，這樣就可以快速 mapping 到每一個 input field 
+
+## 25/10/21
+前面的 Save failed 的問題解決了，好像是因為在 GetNext 檢測 status code 的時候被 skip 掉，導致少記錄到。總之寫入的時候察看一下即可
+
+-> 目前也已經完成注入的字串部分，接著要思考怎麼把樹狀結構加上 hash 讓他好辨識
+-> 還有怎麼把過程送往 OWASP ZAP 比較恰當
+    -> 不知道 OWASP ZAP 能不能吃這種 input
+-> 我發現有些 body 好像不能正確執行 BuildData，有些像下面這樣沒被整理過，正確的格式應該要是第二個
+
+    - "body": "jform%5Btitle%5D=&jform%5Balias%5D=&jform%5Btype%5D=component&jform%5Blink%5D= ...
+    - "body": {
+        "client_id": "0",
+        "menutype": "",
+        "filter[search]": "Fuzzable",
+        "list[fullordering]": "a.lft ASC",
+        ...
+        }
+    
+    這會導致目前正在進行的把 Hash 和 form 的對應號寫入的動作出錯，如果要完成 Hash 部分的話這邊要先改好
+
+-> 不然先研究 OWASP ZAP 吧
+    -> 好像不太能完整的照著我的邏輯做，他沒這麼彈性好用
+    -> FuzzingBook 不知道有沒有戲
+        -> 超級麻煩= = 要下載 msbuild, MSVC, 和 graphviz, 然後 pip install 時會一直卡在 pygraphviz，這個要直接到 PyPl 找 tar.gz 抓下來裝，然後才能 pip install fuzzingbook
+
+## 25/10/23
+-> fuzzingbook 有進展，可以產出很多 XSS Payload 了。
+    -> 但目前的問題是很多 HTML Event 其實不好觸發 XSS，目前先保留，之後可能要回來研究 Event 如何觸發 Script
+    -> 初版的 fuzzingbook 應該完工了
+
+-> 目前 HashtoAPI 還沒完工 (Crawler.py)
