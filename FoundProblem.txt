@@ -232,3 +232,35 @@ Save failed: 'http://192.168.11.129:8080/administrator/index.php?option=com_admi
     -> 初版的 fuzzingbook 應該完工了
 
 -> 目前 HashtoAPI 還沒完工 (Crawler.py)
+
+
+## 25/10/28
+identifiable string -> istring
+-> 目前在執行把網頁上出現可辨識字串的 url 記錄起來
+    -> 用 regex 可以精準地進行辨識，但是為了提高漏洞注入成功率，或許需要連注入點在哪個 tag 都找出來
+        -> 目前已經把 url 上面哪裡有 istring 找了出來，包含他是甚麼 tag
+    -> 在自動尋找的過程中出現 403 API 嘗試瀏覽外部連結
+        -> 應該是因為 requests 會自動進行 redirect，但是 redirect 可能會到外部連結而沒有權限
+            -> 算解決了
+    
+    -> 在 traverse/main.py 中已經把 get 相關的 api 都在檢索一遍，同時取出底下出現 istring 的 url，目前 100 個 requests 裡面有 23 個 fuzzable 的目標
+
+-> 現在需要把 Crawler 的儲存多加上一個 ApiHash，依靠 Api 的 Hash Key 指到特定的 Api，裡面還要包含 body 的參數列表方便 Fuzzer 使用
+    -> 目前在 Crawler 有些 body 沒辦法正確解析body 內的資訊。
+    -> 部分 API 還是無法分析出 Fuzzable 的參數
+        -> http://192.168.11.129:8080/administrator/index.php?option=com_users&view=group&layout=edit  (找的到)
+        -> http://192.168.11.129:8080/administrator/index.php?option=com_users&view=level&layout=edit (找不到)
+        -> 不然抓這兩個網頁的 html source code 出來看好了，直接把這兩個 source code 求 AllTags 然後匯入 GetInputInfo 看看問題在哪
+        -> http://192.168.11.129:8080/index.php/site-settings 這個好像也應該找到 Fuzzable 才對
+            -> 有沒有可能是其實都有找到 只是 BuildData 漏了資料
+
+# 25/10/29
+-> 對的，其實都有找到只是網站有多個同名 form 的時候抓到的資料會出錯。
+    -> 解法應該是將所有 form 欄位都整合成特大表單
+        -> 如果有垃圾元素呢 例如網站中的 SearchWord 會不會造成 Fuzzing 效果或 Fuzzable string 辨識出錯。。
+        -> 我發現同樣的 action 是因為前端可能會按不同的畫面，然後 JS 會 render 出不同的頁面，這種時候 forms 底下的內容就會改，如果後端 function 吃的參數
+        固定的話，搞不好 action 合併後能觸發的 success 更少，應該要維持合併前的作法才對
+
+        -> 如果硬在 joomla 上面實作這種精準的抓取 tag 的動作，可能會導致切換到其他 web 系統時失靈，因為原始碼在撰寫上沒有一定的 pattern 限制，所以精準判斷
+        意義不大。我認為改以 resourcePool 儲存參數結果應該會更好，resourcePool 儲存所有參數是否 Fuzzable 的結果，然後我要注入或者 BuildData 時直接查詢
+        應該會更好，同時理論上也能兼容更多的 Web 系統
