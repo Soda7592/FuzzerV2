@@ -2,7 +2,8 @@ import requests
 import json
 from colorama import Fore, Style, init
 from bs4 import BeautifulSoup
-
+from urllib.parse import urlparse
+root_domain = "192.168.11.129:8080"
 init(autoreset=True)
 
 class ApiSessionHandler:
@@ -21,23 +22,33 @@ class ApiSessionHandler:
     def SendApiRequest(self, method, url, headers=None, data=None):
         if headers is None:
             headers = {}
-        try:
-            # 使用 self.session.request 發送請求，它會自動帶上 cookies
-            response = self.session.request(
-                method,
-                url,
-                headers=headers,
-                data=data,
-                timeout=10 # 設置超時
-            )
-            response.raise_for_status()
-            print(f"{Fore.BLUE}發送請求: {method} {url}{Style.RESET_ALL}")
-            print(f"{Fore.GREEN}請求成功，狀態碼: {response.status_code}{Style.RESET_ALL}")
-            # 如果狀態碼是 4xx 或 5xx，會拋出異常
-            return response
+        while True:
+            try:
+                # 使用 self.session.request 發送請求，它會自動帶上 cookies
+                response = self.session.request(
+                    method,
+                    url,
+                    headers=headers,
+                    data=data,
+                    timeout=10, # 設置超時
+                    allow_redirects=False
+                )
+                print(f"{Fore.BLUE}requesting: : {method} {url}{Style.RESET_ALL}")
+                print(f"{Fore.GREEN}Success: {response.status_code}{Style.RESET_ALL}")
+                if 300 <= response.status_code < 400:
+                    next_url = response.headers.get('Location')
+                    if next_url:
+                        parsed_next_url = urlparse(next_url)
+                        if parsed_next_url.netloc != root_domain:
+                            return response
+                        url = next_url
+                        print(f"{Fore.BLUE}redirecting: {next_url}{Style.RESET_ALL}")
+                        continue
+                    return response
+                return response
             
-        except requests.exceptions.RequestException as e:
-            print(f"{Fore.RED}API 請求失敗: {e}{Style.RESET_ALL}")
-            return None
+            except requests.exceptions.RequestException as e:
+                print(f"{Fore.RED}API Request Failed: {e}{Style.RESET_ALL}")
+                return None
     
     
