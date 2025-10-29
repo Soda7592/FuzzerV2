@@ -22,6 +22,7 @@ from collections import deque
 from modules.requests_handler import ApiSessionHandler
 from modules.ParseArg import ParseBody
 from modules.AnalyseInput import BuildData
+from hashlib import sha1
 
 UrlQueue = []
 VisitedUrl = set()
@@ -29,6 +30,7 @@ ParentMap = {}
 # UrlToApis = {}
 UrlToNode = {}
 UrlToApis = {}
+ApisToHash = {}
 node_dict = {}
 PathsApi = {}
 TotalApi = set()
@@ -41,7 +43,7 @@ VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 118
+MAX_PROCESSED = 30
 RootStartUrl = None
 
 # 取消樹狀圖資料結構，採線性紀錄
@@ -139,12 +141,19 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
             captured = ClickByXpath(driver, xpath)
             if captured is not None:
                 for req in captured:
+                    # print("req['url']: ", req['url'])
+                    # print("req['body']: ", req['body'])
                     data, method = BuildData(AllTags, req['url'], req['body'])
                     # print(data)
                     # print(req['url'])
                     if data is None:
                         if req['method'] == 'POST' and req['body'] != '':
-                            PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
+                            try:
+                                parsed_body = ParseBody(req['body'])
+                                PathsApi[path][req['url']] = {"body":parsed_body, "method":req['method'], "headers":req['headers']}
+                            except Exception as e:
+                                print(f"Error: {e}")
+                                PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
                             # print(f"{{path: {path}, url: {req['url']}}} Missing forms, but POST with body")
                         # print(f"{Fore.RED}Data is None for {req['body']}{Style.RESET_ALL}")
                         pass
@@ -191,6 +200,7 @@ def GetAllTags(driver):
         return AllTags
     except Exception as e:
         print(f"Error: {e}")
+
 
 def GetDomainName(url):
     if "http" in url or "https" in url:
@@ -327,19 +337,28 @@ def GetTime():
     return filename
 
 def Save():
-    try:
-        filename = GetTime()
-        abs_path = os.path.abspath("../ResourcesPool/" + filename) + ".json"
-        BuildUrlToNode()
-        print(f"{Fore.GREEN}UrlToNode: {UrlToNode['http://192.168.11.129:8080/index.php']}{Style.RESET_ALL}")
-        with open(abs_path, 'w', encoding='utf-8') as f:
-            json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
-        with open(f"../ResourcesPool/Apis.json", 'w', encoding='utf-8') as f:
-            json.dump(PathsApi, f, ensure_ascii=False, indent=2)
-        print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"{Fore.RED}Save failed: {e}{Style.RESET_ALL}")
+    # try:
+    filename = GetTime()
+    abs_path = os.path.abspath("../ResourcesPool/" + filename) + ".json"
+    BuildUrlToNode()
+    # print(f"{Fore.GREEN}UrlToNode: {UrlToNode['http://192.168.11.129:8080/index.php']}{Style.RESET_ALL}")
+    with open(abs_path, 'w', encoding='utf-8') as f:
+        json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
+    with open(f"../ResourcesPool/Apis.json", 'w', encoding='utf-8') as f:
+        json.dump(PathsApi, f, ensure_ascii=False, indent=2)
+    # print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
+    # except Exception as e:
+    #     print(f"{Fore.RED}Save failed: {e}{Style.RESET_ALL}")
 
+# def BuildApisToHash():
+#     for url in PathsApi:
+#         FullHash = str(sha1(url.encode()).hexdigest())
+#         HashKey = FullHash[:12]
+#         ApisToHash[HashKey] = {"FullHash":FullHash, "url":url}
+#         for api in PathsApi[url]:
+#             for k in PathsApi[url][api]["body"].keys():
+            
+            
 def safe_save():
     try:
         Save()
@@ -375,7 +394,8 @@ def BuildUrlToNode():
         UrlToNode[url] = {"url":url, "children":[]}
     for url, parent in ParentMap.items():
         if parent is not None:
-            UrlToNode[parent]["children"].append(UrlToNode[url])
+            if parent in UrlToNode:
+                UrlToNode[parent]["children"].append(UrlToNode[url])
     # for url in UrlToNode:
     #     print(f"{Fore.RED}{url}{Style.RESET_ALL} \n-> {Fore.YELLOW}Children: {UrlToNode[url]['children']}{Style.RESET_ALL}\n")
 
@@ -415,4 +435,13 @@ if __name__ == "__main__":
     RootUrl = "http://192.168.11.129:8080/index.php"
     LoginUrl = "http://192.168.11.129:8080/administrator"
     init(autoreset=True)
-    main(RootUrl, LoginUrl)
+    try: 
+        main(RootUrl, LoginUrl)
+    except SystemExit:
+        print(f"{Fore.GREEN}SystemExit{Style.RESET_ALL}")
+    except Exception as e:
+        print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+        print(f"{type(e).__name__}{Style.RESET_ALL}")
+        print(f"{e.__traceback__}{Style.RESET_ALL}")
+    finally:
+        Save()
