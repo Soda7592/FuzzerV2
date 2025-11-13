@@ -264,3 +264,118 @@ identifiable string -> istring
         -> 如果硬在 joomla 上面實作這種精準的抓取 tag 的動作，可能會導致切換到其他 web 系統時失靈，因為原始碼在撰寫上沒有一定的 pattern 限制，所以精準判斷
         意義不大。我認為改以 resourcePool 儲存參數結果應該會更好，resourcePool 儲存所有參數是否 Fuzzable 的結果，然後我要注入或者 BuildData 時直接查詢
         應該會更好，同時理論上也能兼容更多的 Web 系統
+
+# 25/11/05
+-> 目前暫時使用 argsPool 把參數的精度補上一些
+-> 但是出現 redirect 問題，是之前為了解決 redirect 時改的 code，送出 requests 之後會出錯
+    -> task 錯了，我賦值那邊讓他全部統一了
+    -> 有的時候怪怪的 先用舊版的 requests_handler，然後 administrator 那邊 session 要把 db 和 php 的都啟用
+
+# 25/11/06
+先來實驗有 argParse.py 和沒有的區別
+-> crawler 裡面 process 100 個 url
+    -> Total result found: 355 (ArgParse)
+        -> 但這次的 container 送過蠻多次 injectharmless，不知道有沒有區別
+    -> Total result found: 104 (No ArgParse)
+        -> 可能要在測試一次，前面有亂掉的地方~''~
+
+
+-> 接下來要實作在網頁中找到 Fuzzable 的 API 的 Hash Map，存 Full Hash 還是 Hash key(12位)?
+    -> 12 位的 hash 要達到碰撞機率 50% 需要的 k 為 16777216 個 API，一般系統中不可能出現那麼多
+        -> 如果一個網站只有 1000 個 API，那麼發生碰撞的機率僅約為 1.776*10^-9，可忽略不計。
+    -> 直接用 12 位 hash 當作 Key 來紀錄資料即可
+    -> 在爬蟲階段就紀錄 API，因為如果再 injectharmless 階段會有太多不必要的寫入操作 
+
+reflectUrl 可以 mapping 到 apis.json 的 key，從這個 value 底下找 hash12 相同的來用就好，
+目前的 code 可能可以往下，但是我的 Apis 和 reflectMap 是不同情形下產生的，所以直接跑會出錯，需要再跑一次 Crawler
+
+    {
+        apiHash : {
+            hash12 : {
+                apiUrl: "" 
+                body : {
+                    Fuzzable or original value
+                }
+                hash40 : ""
+                reflectUrl : []
+            }
+        }
+    }
+
+*******
+問題: 
+- 這麼多 Fuzzable 參數，我應該對每個參數都獨立進行 Fuzzing 還是一次一坨一起
+    -> 一次一坨的話如果因為特定參數導致 req 被擋掉怎麼辦
+    -> 一次一個的話要測多少遍，該不該留下來
+
+- 我發現雖然是不同的 API，但很可能都是相同參數在被 Fuzz 譬如 jform[title]，但不確定會不會是個案，需不需要將這種參數記錄起來 ?
+*******
+
+
+## 
+先看一下上一次的 這邊做完後趕快去把 FuzzingBook 連起來
+
+## 25/11/12
+
+哭啊，有一個網頁從 /index.php 看到是 http://192.168.11.129:8080/index.php?task=article.edit&a_id=1&return=aHR0cDovLzE5Mi4xNjguMTEuMTI5OjgwODAvaW5kZXgucGhw
+連過去後 current 會變成 http://192.168.11.129:8080/index.php?view=form&layout=edit&a_id=1&return=aHR0cDovLzE5Mi4xNjguMTEuMTI5OjgwODAvaW5kZXgucGhw
+
+這導致後面的 traverse 的動作做不起來，因為會出現 key error，問題的原因是 request 和 response 的 url 不同，這可能是內部有涉及 redirect 的處理
+    -> 因為我後面的連結都是透過 url 進行 key mapping，這個影響是致命的，必須想辦法解掉QQ
+    -> 目前暫無法處理這個問題，只能先手動修改 url 的數值讓兩邊能 match
+
+哭啊，不是每個網頁上的 iString 來源 API 都在該網頁下，所以用 apis[key] 去做 mapping 根本找不到，還是得回頭用 hash12 做一個 key-value 的 dictionary
+
+依照上次的 apiHash:{} 結構，我的檢測方式應該是只針對這些API的Fuzzable輸入進行檢測
+- 打開 apiHash:{} 結構，然後遍歷 hash12
+-> {
+    hash12: {
+        apiUrl:
+        body: {
+            網頁中找到的改成 fuzzable
+            其餘留原樣
+        }
+        header:
+        method
+    }
+   }
+然後這些 hash12 全部跑一次後從 reflectMap 裡面讀 url 確認就好了
+
+- 找出網頁中全部的 hash12 然後沒有在裡面的直接把 key 拔掉
+    - 目前 hashSet 已經過濾出所有能用的 API，接下來要把 hashes 裡面不存在 hashSet 中的 key 拔掉
+    - 拔完之後就能遍歷 reflectMap 然後改 hashes 裡面的 body，最後就能直接拿這個 hashes 進行 fuzzing
+- Fuzzable 的值改成 FuzzableX，反之設定回 NA，不是 Fuzzable 的則用原本的值。
+
+-> 目前找到了不重複的 hash12 和實作了使用 index 取出 body 內的 key,value
+
+明天要做 -> 依照 hashSet 遍歷 hashes, 如果不在 Set 裡面的 key 直接拔掉，反之如果在裡面就依照 refleactMap 裡面的參數修改 hashes[hash][body] 裡面的值
+
+    -> 這有個問題是會不會 UrlA 和 UrlB 都有可用的 api HashA，其中 UrlA 的 iString 為 F0, F1。而 UrlB 的 iString 為 F1 F2。
+        -> 有沒有可能 Fuzzing F0 後會讓 UrlB Failed?
+            -> 應該有可能
+                -> 如果直接針對去重複的 hash 接 Fuzzingbook -> 可能有些值太長反而讓 req failed
+                    -> 這層過濾有機會能提高 req 成功機率，也可能完全無效
+
+>>>>>>>>  應該要先直接去重複後用 hashes 接 Fuzzingbook 才對 
+
+
+## 25/11/13
+
+目前在主頁的 title 處發現注入一個可以點擊的東西 疑似 tag 會觸發，但是點擊下去後沒有反應，不過這是一個好的訊號!!
+
+```
+'<object data="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg" type="text/html"data:text/html,<script>Alert(2)</script>" type="text/html"data:application/xml,<sVG ondblclick=open(2)> %3E<image href=javascript:alert(2) onwheel=open(2)> </sVG><" type="application/xml"data:text/html,<script>Open(2)</script>" type="text/html"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg" type="text/html 2 <object>`
+```
+
+成功注入了 shit，但我找不到是哪裡注入的 Payload 太長了
+
+找到了，資訊都在 ReasearchPic 裡面，可以停下來稍微整理資料和老師報告了
+
+目前執行順序是 Cralwer/main.py -> injectharmless/ArgParse.py -> injectharmless/main.py -> traverse/main.py -> Fuzzing/Fuzzer.py
+
+能順利注入 Payload，並且真的有找到 API 是能夠觸發 Stored XSS 的，不過現在的問題是 JS 注入後網頁一定會出現，會不會執行又是一回事所以不好做事後的檢測，
+即使輸入可識別字串也不能確定 Payload 到底會不會被執行，還有的問題是我的 Fuzzer 產出來的 Payload 不一定是可用的 XSS Payload
+
+Todo
+-> 修改 Fuzzer 讓他產出來的東西一定可用
+-> 找到比較適當的紀錄手段

@@ -36,6 +36,7 @@ PathsApi = {}
 TotalApi = set()
 PathsPath = {}
 ProxyHost = "http://127.0.0.1"
+hashToApi = {}
 ProxyPort = 8080
 EXCLUDE_KEYWORDS = {"login","logout", "install", "installer", "plugin"}
 # 控制是否顯示詳細除錯資訊
@@ -43,7 +44,7 @@ VERBOSE = False
 
 # 進度統計：已處理 URL 數量
 ProcessedCount = 0
-MAX_PROCESSED = 30
+MAX_PROCESSED = 15
 RootStartUrl = None
 
 # 取消樹狀圖資料結構，採線性紀錄
@@ -134,6 +135,7 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
         if tag.get("onclick",""):
             path = driver.current_url.rstrip("/")
             if path not in PathsApi:
+                print(f"{Fore.RED}path: {path}{Style.RESET_ALL}")
                 PathsApi[path] = {}
             if tag.get("href") == "#":
                 continue
@@ -146,19 +148,24 @@ def GetPotentialInteractive(driver, RootUrl, AllTags):
                     data, method = BuildData(AllTags, req['url'], req['body'])
                     # print(data)
                     # print(req['url'])
+                    hash40 = str(sha1(req['url'].encode('utf-8')).hexdigest())
+                    hash12 = hash40[:12]
                     if data is None:
                         if req['method'] == 'POST' and req['body'] != '':
                             try:
                                 parsed_body = ParseBody(req['body'])
-                                PathsApi[path][req['url']] = {"body":parsed_body, "method":req['method'], "headers":req['headers']}
+                                PathsApi[path][req['url']] = {"body":parsed_body, "method":req['method'], "headers":req['headers'], "hash40":hash40, "hash12":hash12}
+                                hashToApi[hash12] = {'url':req['url'], "body":parsed_body, "method":req['method'], "headers":req['headers']}
                             except Exception as e:
                                 print(f"Error: {e}")
-                                PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers']}
+                                PathsApi[path][req['url']] = {"body":req['body'], "method":req['method'], "headers":req['headers'], "hash40":hash40, "hash12":hash12}
+                                hashToApi[hash12] = {'url':req['url'], "body":req['body'], "method":req['method'], "headers":req['headers']}
                             # print(f"{{path: {path}, url: {req['url']}}} Missing forms, but POST with body")
                         # print(f"{Fore.RED}Data is None for {req['body']}{Style.RESET_ALL}")
                         pass
                     else:
-                        PathsApi[path][req['url']] = {"body":data, "method":method, "headers":req['headers']}
+                        PathsApi[path][req['url']] = {"body":data, "method":method, "headers":req['headers'], "hash40":hash40, "hash12":hash12}
+                        hashToApi[hash12] = {'url':req['url'], "body":data, "method":req['method'], "headers":req['headers']}
                     debug(f"captured api url: {req['url']}")
             if driver.current_url != path and driver.current_url not in VisitedUrl:
                 new_url = driver.current_url.rstrip("/")
@@ -229,10 +236,6 @@ def GetUrlPath(url, RootDomain):
         return url
 
 def GetMergeUrl(current, path):
-    # Joomla 的特定解析格式
-    # 如果 current 是 /administrator/index.php 且 path 是 index.php 開頭，那合併就會出錯
-    # 如果 current 是 /administrator 且 path 是 /index.php，那合併就會出錯
-    # 再多找找幾種情況
     if current.endswith("/administrator") and path.startswith("index.php"):
         return current + "/" + path
     return urljoin(current, path)
@@ -346,6 +349,8 @@ def Save():
         json.dump(UrlToNode["http://192.168.11.129:8080/index.php"], f, ensure_ascii=False, indent=2)
     with open(f"../ResourcesPool/Apis.json", 'w', encoding='utf-8') as f:
         json.dump(PathsApi, f, ensure_ascii=False, indent=2)
+    with open(f"../ResourcesPool/hashToApi.json", 'w', encoding='utf-8') as f:
+        json.dump(hashToApi, f, ensure_ascii=False, indent=2)
     # print(f"{Fore.GREEN}Saved data to {abs_path}{Style.RESET_ALL}")
     # except Exception as e:
     #     print(f"{Fore.RED}Save failed: {e}{Style.RESET_ALL}")

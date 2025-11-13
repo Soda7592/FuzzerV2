@@ -69,7 +69,7 @@ def GetInputInfo(all_bs_tags):
     if not forms:
         # print(all_bs_tags)
         print(f"{Fore.YELLOW}頁面中未偵測到 <form> 標籤。{Style.RESET_ALL}")
-        print(all_bs_tags)
+        # print(all_bs_tags)
         return None
     
     # http://192.168.11.129:8080/administrator/index.php?option=com_users&view=level&layout=edit
@@ -131,8 +131,8 @@ def GetInputInfo(all_bs_tags):
     # print(f"{Fore.RED}forms_info: {forms_info}{Style.RESET_ALL}")
     # forms_info = MergeSameAction(forms_info)
     #print(f"{Fore.RED}forms_info: {forms_info}{Style.RESET_ALL}")
-    if HasDuplicateActions(forms_info):
-        forms_info = MergeSameAction(forms_info)
+    # if HasDuplicateActions(forms_info):
+    #     forms_info = MergeSameAction(forms_info)
     return forms_info
 
 def BuildData(AllTags, url, body_str) :
