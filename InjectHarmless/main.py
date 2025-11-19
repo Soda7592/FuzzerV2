@@ -16,7 +16,7 @@ def GetLoginSession():
         return json.load(f)
 
 def GetApis():
-    apis = open(ResourcesPool + "Apis.json", "r", encoding="utf-8").read()
+    apis = open(ResourcesPool + "parsedApis.json", "r", encoding="utf-8").read()
     return json.loads(apis)
 
 def GetUrlInfo(url):

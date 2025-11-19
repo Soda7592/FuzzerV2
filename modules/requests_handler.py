@@ -23,8 +23,8 @@ class ApiSessionHandler:
                 timeout=10 # 設置超時
             )
             
-            print(f"{Fore.BLUE}發送請求: {method} {url}{Style.RESET_ALL}")
-            print(f"{Fore.GREEN}請求成功，狀態碼: {response.status_code}{Style.RESET_ALL}")
+            print(f"{Fore.BLUE}requesting: {method} {url}{Style.RESET_ALL}")
+            # print(f"{Fore.GREEN}請求成功，狀態碼: {response.status_code}{Style.RESET_ALL}")
             response.raise_for_status() # 如果狀態碼是 4xx 或 5xx，會拋出異常
             
             return response

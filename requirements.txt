@@ -5,3 +5,5 @@ colorama
 selenium-wire
 blinker==1.4
 setuptools
+lxml
+fuzzingbook>=0.5.5

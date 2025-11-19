@@ -379,3 +379,65 @@ reflectUrl 可以 mapping 到 apis.json 的 key，從這個 value 底下找 hash
 Todo
 -> 修改 Fuzzer 讓他產出來的東西一定可用
 -> 找到比較適當的紀錄手段
+
+
+## 25/11/18
+
+回扣上禮拜的兩個議題，Fuzzer & 如何紀錄和檢查 XSS 發生與否
+
+我忽然在想，其實 Fuzzer 語法或許並不是我應該要努力鑽研的地方，因為目前重點在廣撒而不是單點要繞過強大的 WAF。
+有幾個改變方法:
+-> 從已知的強大的地方抓 Payload 下來用，例如 kali 上面的 wordlist、OWASP ZAP 或是 burpsuite 裡面的 wordlist，抓出來後只是 random 抓一個來用
+-> 盡量修剪目前無效的內容，只留下有效的就好(這樣可能會產生一些無效的 Payload,但是能涵蓋到非常廣的 tag 和 on event)
+
+而記錄的部分，在問 Grok 後發現其實 ZAP 和 Burp scanner 有類似的 XSS 自動檢查功能，只是還不像我的一樣能夠做到只手動取得 login session，
+同時他們的檢查方式可能是透過瀏覽器去看 JS 行為(這邊還不確定他們的實作細節 Grok 說的)，這樣的操作很難全自動化，我目前想嘗試透過 overrideing js
+的辦法，好像可以在 selenium 中注入 js 腳本去修改 alert 或其他 function 的行為，讓他只 console.log 一個訊息而不是卡住整個網頁，這樣子是個更好
+的做自動化檢測的辦法，而且我還沒在論文中看過別人這樣做過(都是注入標籤然後檢查 response)，或許可以嘗試看看
+
+-> 目前的流程都完成後到 /Check/example.py 啟動 python 後可以檢測網頁中的 alert tag，甚至可以抓 alert 的傳入 msg。同時只要印出
+url 就能直接定位 xss 的發生網頁，不過還沒有辦法定位 api。
+
+先全部重洗，嘗試抓 100 個 path 然後先驗 100 個 path 有多少個 fuzzable，接著在執行 fuzzing
+-> 沒有用 ArgParse.py 一共有 40 個 Fuzzable 的點
+-> 100 次沒用 ArgParse.py 只有最起初的兩個 alert()
+    -> ArgParse.py 的問題? 還是 Fuzzer 的問題? 還是本身 Joomla 的漏洞就在演算法能 cover 之外?
+        -> 嘗試執行 ArgParse 再試一次
+        -> 追加上靜態檢測再試一次，疑似可以注入的位子手動測試
+        -> 上面兩個都不行就認定漏洞本身在演算法能 Cover 的範圍之外。
+
+-> 改用 ArgParse.py 一共有 295 個 Fuzzable 的點
+
+
+等等，忘記做登入了，所以現在什麼檢測能檢測的範圍都很小
+
+因為目前檢測的 context 是主畫面，注入攔截的方式如果遇到 <object> <iframe> 這種另外建 context 的 tag 會導致沒辦法抓到
+-> 可是他在瀏覽器內也不會跳 alert()? 如果是注入當前的 context 為什麼跳 alert 的行為會被更改? (還沒問)
+
+## 25//11/19
+
+stored XSS應該算是 ok 了，現在確定在 Check/example.py 裡面可以登入，而且能確實偵測到 alert 事件並且轉化為 console.log
+然後偵測出來。
+
+同時有在 Fuzzer 處修改成直接檢測 Reflected，方法是看 response 然後確認 response.text 中有沒有自己輸入的 canary id 以及 on event，
+透過這個方法我成功找到第二個漏洞在 com_config 處，CVE 編號是 CVE-2019-9712
+
+提問:
+- 為甚麼需要把 alert 轉化成 console.log，如果轉化成 consolo.log 能夠當成是 XSS 漏洞，為甚麼不一開始 Payload 放 console.log() ?
+    -> 因為曾經做過的滲透測試在實務上只有嚴格的，能夠控制行為的動作才能被當作是 XSS，例如 alert, prompt, confirm, open, fetch 等等，忘記做登入了，所以必須
+    而我的研究目的是找出確實能造成危害的 function，因此直接使用帶有危害性的語法才是正確，至於轉成 console.log 是為了不要讓彈出視窗卡到測試過程，並且轉成 log 會更好識別。
+
+- 為甚麼只需要輸入這麼少的 api，而不是每個網頁下的 api 都測試一次? 有沒有可能這樣會漏掉 reflected XSS?
+    -> reflected XSS 是在執行完的當下的網頁中出現注入語法，之後不一定會儲存在網頁上，所以執行完 api 後檢查 response 這個過程本身是合乎邏輯的
+    而且檢查的是 api 本身而非前端邏輯我認為才是修補漏洞的 best practice，因為一個 api 可能影響很多頁面，如果針對單一頁面去修改很可能只修補掉部分漏洞而不是根絕程式碼本身的問題。
+
+目前研究到這已經順利把一切都串起來了，不過像是 CVE-2019-9712 的觸發需要透過 "> 的閉合，這個在我的 fuzzer 還是不一定能自動產生，
+-> Fuzzer 可能要改
+-> Fuzzing 邏輯可能也要改，目前有兩個，其一是一次灑全部的 payload 進去所有 fuzzable 的參數，這個方法可能導致 response 直接吃到 500 使得實驗無效
+   不過因為前身有做過參數 fuzzable 與否的研究，所以整體導致 500 的機率挺小；第二種模式是每個參數輪詢，一個一個輸入，這樣能找到非常具體的漏洞位子與成因
+    -> 但理論上 Fuzzing 是對同一個位子一直輸入修改過的 Payload 吧? 目前這樣好像怪怪的，或許可以找到潛在可能有問題 arg 然後繼續輪詢一定次數
+
+下一次:
+-> 思考 Fuzzing 邏輯
+-> 思考 Fuzzer 產 Payload 邏輯
+-> 整理研究資料(實作進度、產出以及和其他論文比較)，找下一個研究網頁

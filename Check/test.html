@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Drag Test</title>
+    <style>
+        /* 1. 透過 CSS 讓壞掉的圖片有一個大大的可點擊區域 */
+        img {
+            display: block;
+            width: 200px;
+            height: 200px;
+            background-color: #ffcccc; /* 紅色背景讓你容易看到 */
+            border: 5px dashed red;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h3>請嘗試拖曳下面的紅色方塊：</h3>
+
+    <img src='x' draggable="true" ondrag="alert('XSS Triggered!')">
+    <script> alert('testalert') </script>
+    
+
+</body>
+</html>
